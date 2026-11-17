@@ -1,5 +1,5 @@
 import { Workflow } from "lucide-react";
-import {LoginForm} from "../components/login-form";
+import { LoginForm } from "../components/login-form";
 
 function Login() {
   return (
@@ -23,13 +23,9 @@ function Login() {
           </p>
         </div>
 
-        {/* Login Card */}
         <div className="rounded-3xl border border-white/10 bg-white/0.4 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl sm:p-9">
           <LoginForm />
         </div>
-
-        {/* Footer */}
-     
 
         <p className="mt-8 text-center text-xs text-zinc-600">
           Powered by intelligent automation

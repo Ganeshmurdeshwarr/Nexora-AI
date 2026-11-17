@@ -50,7 +50,6 @@ export default function Home() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { userData } = useSelector((state) => state.auth);
-console.log(userData)
 
   const [logoutLoading, setLogoutLoading] = useState(false);
 

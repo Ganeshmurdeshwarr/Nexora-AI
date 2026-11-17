@@ -36,13 +36,9 @@ export function LoginForm({ className, ...props }) {
       setLoading(true);
       setError("");
 
-      // Firebase Google Authentication
       const result = await signInWithPopup(auth, googleProvider);
-
-      // Firebase ID token
       const token = await result.user.getIdToken();
 
-      // Send token in request body to backend
       const data=await login(token);
       dispatch(setUserData(data.user))
       navigate("/", { replace: true });

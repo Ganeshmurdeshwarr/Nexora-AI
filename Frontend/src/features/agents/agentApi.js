@@ -1,33 +1,43 @@
-// import api from "@/api";
+import api from "@/api";
 
+export const createAgent = async (name, knowledgeBase, instructions, tools) => {
+  try {
+    const response = await api.post(
+      "/api/agents",{
+      name,
+      knowledgeBase,
+      instructions,
+      tools,}
+    );
+    return response.data;
+  } catch (error) {
+    console.log(error);
+  }
+};
 
+export const getAllAgent = async () => {
+  try {
+    const response = await api.get("/api/agents");
+    return response.data;
+  } catch (error) {
+    console.log(error);
+  }
+};
 
-// // Fetch all agents
-// export const fetchAgentsApi = async () => {
-//   const response = await api.get("/api/agents");
-//   return response.data;
-// };
+export const getAgentById = async (agentId) => {
+  try {
+    const response = await api.get(`/api/agents/${agentId}`);
+    return response.data;
+  } catch (error) {
+    console.log(error);
+  }
+};
 
-// // Fetch single agent
-// export const fetchAgentByIdApi = async (agentId) => {
-//   const response = await api.get(`/api/agents/${agentId}`);
-//   return response.data;
-// };
-
-// // Create agent
-// export const createAgentApi = async (agentData) => {
-//   const response = await api.post("/api/agents", agentData);
-//   return response.data;
-// };
-
-// // Update agent
-// export const updateAgentApi = async (agentId, agentData) => {
-//   const response = await api.put(`/api/agents/${agentId}`, agentData);
-//   return response.data;
-// };
-
-// // Delete agent
-// export const deleteAgentApi = async (agentId) => {
-//   const response = await api.delete(`/api/agents/${agentId}`);
-//   return response.data;
-// };
+export const deleteAgent = async (agentId) => {
+  try {
+    const response = await api.delete(`/api/agents/${agentId}`);
+    return response.data;
+  } catch (error) {
+    console.log(error);
+  }
+};

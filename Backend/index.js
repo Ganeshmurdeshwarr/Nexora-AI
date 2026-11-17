@@ -5,11 +5,8 @@ import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import { connectDB } from "./config/db.js";
 import authRouter from "./routes/auth.routes.js";
-// import agentRouter from "./routes/agent.routes.js";
-// import agentChatRouter from "./routes/agentChat.routes.js";
-// import chatRouter from "./routes/chat.routes.js";
-// import integrationRouter from "./routes/integration.route.js";
-// import paymentRouter from "./routes/payment.routes.js";
+import agentRouter from "./routes/agent.routes.js";
+
 dotenv.config();
 
 const app = express();
@@ -25,11 +22,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use("/api/auth",authRouter)
-// app.use("/api/agents", agentRouter);
-// app.use("/api/agent-chat", agentChatRouter);
-// app.use("/api/chat", chatRouter);
-// app.use("/api/integrations", integrationRouter);
-// app.use("/api/payment", paymentRouter);
+app.use("/api/agents", agentRouter);
 
 
 app.listen(PORT, () => {
