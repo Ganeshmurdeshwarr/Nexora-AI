@@ -33,7 +33,6 @@ function Agents() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
-
   const loadAgents = async () => {
     setLoading(true);
     try {
@@ -53,11 +52,10 @@ function Agents() {
     loadAgents();
   }, []);
 
-  const handleDelete = async (agent) => {
-    const agentId = agent?._id ?? agent?.id;
+  const handleDelete = async (agentId) => {
 
     const confirmed = window.confirm(
-      `Are you sure you want to delete "${agent?.name}"?`
+      `Are you sure you want to delete "${agentId}"?`
     );
 
     if (!confirmed) return;
@@ -69,7 +67,7 @@ function Agents() {
       await deleteAgent(agentId);
 
       setAgents((previous) =>
-        previous.filter(
+        previous?.filter(
           (item) => (item?._id ?? item?.id) !== agentId
         )
       );
@@ -80,7 +78,7 @@ function Agents() {
       setDeletingId(null);
     } 
   };
-  const filteredAgents = agents?.agents?.filter((agent) => {
+  const filteredAgents = agents?.filter((agent) => {
     const query = search?.toLowerCase();
 
     return (
@@ -183,7 +181,6 @@ function Agents() {
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filteredAgents?.map((agent) => {
                 const agentId = agent?._id ?? agent?.id;
-
                 return (
                   <div
                     key={agentId}
@@ -196,7 +193,7 @@ function Agents() {
 
                       <button
                         type="button"
-                        onClick={() => handleDelete(agent)}
+                        onClick={() => handleDelete(agentId)}
                         disabled={deletingId === agentId}
                         aria-label={`Delete ${agent?.name}`}
                         className="rounded-lg p-2 text-zinc-500 transition hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
@@ -258,25 +255,7 @@ function Agents() {
                   : "Create your first AI agent to get started."}
               </p>
 
-              {search ? (
-                <Button
-                  variant="outline"
-                  onClick={() => setSearch("")}
-                  className="mt-5 rounded-xl border-white/10 bg-white/4 text-zinc-200 hover:bg-white/10 hover:text-white"
-                >
-                  Clear search
-                </Button>
-              ) : (
-                <Button
-                  asChild
-                  className={`mt-5 inline-flex h-10 items-center gap-2 ${whiteBtn}`}
-                >
-                  <Link to="/agents/new">
-                    <Plus size={17} className="shrink-0" />
-                    <span>Create agent</span>
-                  </Link>
-                </Button>
-              )}
+             
             </div>
           )}
 

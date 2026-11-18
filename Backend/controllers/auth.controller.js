@@ -18,7 +18,6 @@ export const login = async (req, res) => {
 
     if (!firebaseToken) {
       return res.status(401).json({
-        success: false,
         message: "Firebase ID token is required.",
       });
     }
@@ -27,7 +26,6 @@ export const login = async (req, res) => {
 
     if (!decoded.uid || !decoded.email) {
       return res.status(401).json({
-        success: false,
         message: "Invalid Firebase user information.",
       });
     }
@@ -65,22 +63,12 @@ export const login = async (req, res) => {
 
     res.cookie("token", jwtToken, cookieOptions);
 
-    return res.status(200).json({
-      success: true,
-      message: "Login successful.",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        profilePicture: user.profilePicture,
-      },
-    });
+    return res.status(200).json(user );
   } catch (error) {
     console.error("Login error:", error.message);
 
    
     return res.status(500).json({
-      success: false,
       message: `Login failed. ${error}`,
     });
   }
@@ -95,29 +83,24 @@ export const logOut = async (req, res) => {
   });
 
   return res.status(200).json({
-    success: true,
     message: "Logout successful.",
   });
 };
 
 export const me = async (req, res) => {
   try {
-    return res.status(200).json({
-      success: true,
-      user: {
+    const  user= {
         id: req.user._id,
         firebaseUid: req.user.firebaseUid,
         name: req.user.name,
         email: req.user.email,
         profilePicture: req.user.profilePicture,
-        credits:req.user.credits
-      },
-    });
+      }
+    return res.status(200).json( user);
   } catch (error) {
     console.error("Me controller error:", error.message);
 
     return res.status(500).json({
-      success: false,
       message: "Failed to fetch user.",
     });
   }
