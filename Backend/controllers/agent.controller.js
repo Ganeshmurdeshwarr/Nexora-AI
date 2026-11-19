@@ -16,6 +16,13 @@ export const createAgent = async (req, res) => {
       });
     }
 
+    const existingAgentName = await Agent.findOne({name})
+    if(existingAgentName){
+      return  res.status(400).json({
+        message: "Agent with this  name already exist.",
+      })
+    }
+
     const agent = await Agent.create({
       userId: req.user._id,
       name: name.trim(),

@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Bot, Check, Plus, Workflow } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { createAgent } from "@/features/agents/agentApi";
+import { createAgent, getAllAgent } from "@/features/agents/agentApi";
+import { setAgents, setAgentsLoading } from "@/redux/agentSlice";
+import { useDispatch } from "react-redux";
 
 const darkPanel =
   "border border-white/10 bg-white/[0.04] shadow-[0_20px_60px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl";
@@ -56,6 +58,7 @@ export default function CreateAgent() {
 
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const dispatch = useDispatch()
 
   const toggleTool = (toolId) => {
     setTools((previous) => {
@@ -67,25 +70,35 @@ export default function CreateAgent() {
     });
   };
 
+ 
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     try {
       setError("");
-      setSaving(true);
-
+      
       if (!name.trim() || !instructions.trim()) {
         setError("Agent name and instructions are required.");
         return;
       }
+      setSaving(true);
+      
+      const result = await createAgent(
+        name,
+        knowledgeBase,
+        instructions,
+        tools,
+      );
+      if (result?.response?.data?.message) {
+        console.log(error);
+        setError(result?.response?.data?.message);
+        setSaving(false);
 
-       await createAgent(name, knowledgeBase, instructions, tools);
-
+        return;
+      }
+      setSaving(false);
       navigate("/agents");
     } catch (error) {
-      setError(
-        error.response?.data?.message ||
-          "Unable to create agent. Please try again.",
-      );
       setSaving(false);
     }
   };
@@ -133,9 +146,7 @@ export default function CreateAgent() {
             </p>
           </div>
 
-          <form
-            className={`space-y-7 rounded-3xl p-5 sm:p-7 ${darkPanel}`}
-          >
+          <form className={`space-y-7 rounded-3xl p-5 sm:p-7 ${darkPanel}`}>
             <section className="space-y-5">
               <div>
                 <label

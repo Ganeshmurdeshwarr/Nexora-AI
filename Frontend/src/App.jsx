@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Login from "./pages/Login";
 import { me } from "./features/auth";
@@ -8,11 +8,15 @@ import Home from "./pages/Home";
 import Integration from "./pages/Integration";
 import CreateAgent from "./pages/CreateAgent";
 import Agents from "./pages/Agents";
+import { chat } from "./features/chat";
+import {  setAgents, setAgentsLoading } from "./redux/agentSlice";
+import { getAllAgent } from "./features/agents/agentApi";
 
 function App() {
   const dispatch = useDispatch();
   
-  const { userData, loading, error } = useSelector((state) => state.auth);
+  const { userData, loading } = useSelector((state) => state.auth);
+  const [error ,setError] = useState("")
 
   useEffect(() => {
     const fetchUser  = async () => {
@@ -26,6 +30,24 @@ function App() {
     };
     fetchUser ()
   },[dispatch]);
+
+   const loadAgents = async () => {
+      dispatch(setAgentsLoading(true))
+    try {
+      setError("");
+      const data = await getAllAgent();
+      dispatch(setAgents(data))
+      dispatch(setAgentsLoading(false))
+    } catch (err) {
+      dispatch(setAgentsLoading(false))
+      setError(
+        err?.response?.data?.message || "Failed to load agents."
+      );
+    } 
+  };
+   useEffect(() => {
+    loadAgents();
+  }, []);
 
     if (loading) {
     return <div>Checking authentication...</div>;

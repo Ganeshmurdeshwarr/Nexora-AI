@@ -11,7 +11,8 @@ export const createAgent = async (name, knowledgeBase, instructions, tools) => {
     );
     return response.data;
   } catch (error) {
-    console.log(error);
+    console.log(error)
+return error
   }
 };
 

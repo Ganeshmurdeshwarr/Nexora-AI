@@ -1,0 +1,43 @@
+import { HumanMessage } from "@langchain/core/messages";
+import chatGraph from "../utils/chatGraph.js";
+
+export const chat = async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message.trim()) {
+      return res.status(400).json({
+        message: "Message is required.",
+      });
+    }
+
+    const threadId = String(req.user._id);
+
+    if (message.length > 10000) {
+      return res.status(400).json({
+        message: "Message cannot exceed 10000 characters.",
+      });
+    }
+
+    const data = await chatGraph.invoke(
+      {
+        messages: [new HumanMessage(message.trim())],
+      },
+      {
+        configurable: { thread_id:threadId },
+      },
+    );
+
+    const lastMessage = data.messages.at(-1).content;
+
+    return res.status(200).json({
+      aiMessage: lastMessage,
+    });
+  } catch (error) {
+    console.error("Normal chat error:", error);
+
+    return res.status(502).json({
+      message: "Unable to generate an AI response.",
+    });
+  }
+};

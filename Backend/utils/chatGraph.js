@@ -1,0 +1,63 @@
+import dotenv from "dotenv"
+import { ChatGroq } from "@langchain/groq";
+import {
+    StateGraph,
+    MessagesAnnotation,
+    START,
+    END,
+} from "@langchain/langgraph";
+import { MongoDBSaver } from "@langchain/langgraph-checkpoint-mongodb";
+import { MongoClient } from "mongodb";
+dotenv.config()
+
+
+
+
+const llm = new ChatGroq({
+    model: "openai/gpt-oss-120b",
+    apiKey:process.env.GROQ_MODEL,
+    temperature: 0,
+    maxTokens: undefined,
+    maxRetries: 2,
+})
+
+
+const client = new MongoClient(process.env.MONGODB_URI);
+const checkpointer = new MongoDBSaver({ client, dbName: "langgraph" });
+
+
+
+const chatNode = async (state) => {
+  const response = await llm.invoke(state.messages);
+  return {
+    messages: [response],
+  };
+};
+
+const builder = new StateGraph(MessagesAnnotation)
+  .addNode("chatNode", chatNode)
+  .addEdge("__start__","chatNode")
+  .addEdge("chatNode", "__end__");
+
+const chatGraph = builder.compile({checkpointer});
+
+export default chatGraph
+
+
+
+// export const getChatGraph = async () => {
+//   if (!chatGraphPromise) {
+//     chatGraphPromise = (async () => {
+//       const checkpointer = await getCheckpointer();
+
+//       return builder.compile({
+//         checkpointer,
+//       });
+//     })().catch((error) => {
+//       chatGraphPromise = undefined;
+//       throw error;
+//     });
+//   }
+
+//   return chatGraphPromise;
+// };

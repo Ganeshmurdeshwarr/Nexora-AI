@@ -19,6 +19,8 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useDispatch, useSelector } from "react-redux";
+import { setAgents, setAgentsLoading, setDeleteAgent, setSelectedAgent } from "@/redux/agentSlice";
 
 
 const darkPanel =
@@ -28,29 +30,29 @@ const whiteBtn =
   "rounded-xl border-0 bg-white text-zinc-900 hover:bg-zinc-200 hover:text-zinc-900";
 
 function Agents() {
-  const [agents, setAgents] = useState([]);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
-  const loadAgents = async () => {
-    setLoading(true);
+  const dispatch = useDispatch()
+const { agents , agentsLoading: loading }= useSelector(state=>state.agent)
+ 
+
+  useEffect(() => {
+     const loadAgents = async () => {
+    dispatch(setAgentsLoading(true));
     try {
       setError("");
       const data = await getAllAgent();
-      setAgents(data);
-      setLoading(false)
+      dispatch(setAgents(data));
+      dispatch(setAgentsLoading(false));
     } catch (err) {
-      setError(
-        err?.response?.data?.message || "Failed to load agents."
-      );
-      setLoading(false);
-    } 
+      dispatch(setAgentsLoading(false));
+      setError(err?.response?.data?.message || "Failed to load agents.");
+    }
   };
-
-  useEffect(() => {
     loadAgents();
-  }, []);
+  }, [dispatch]);
+
 
   const handleDelete = async (agentId) => {
 
@@ -65,12 +67,9 @@ function Agents() {
       setError("");
 
       await deleteAgent(agentId);
+      dispatch(setDeleteAgent(agentId))
 
-      setAgents((previous) =>
-        previous?.filter(
-          (item) => (item?._id ?? item?.id) !== agentId
-        )
-      );
+     
     } catch (err) {
       setError(
         err?.response?.data?.message || "Failed to delete agent."
@@ -160,7 +159,7 @@ function Agents() {
             </div>
 
             <p className="text-xs text-zinc-500">
-              {agents.length} {agents.length === 1 ? "agent" : "agents"}
+              {agents?.length} {agents?.length === 1 ? "agent" : "agents"}
             </p>
           </div>
 
@@ -218,9 +217,9 @@ function Agents() {
                       <span className="text-xs text-zinc-600">
                         My Agent
                       </span>
-
                       <Button
                         asChild
+                        onClick={()=> dispatch(setSelectedAgent(agent?.name))}
                         variant="ghost"
                         size="sm"
                         className="h-8 gap-1.5 rounded-lg text-zinc-300 hover:bg-white/10 hover:text-white"

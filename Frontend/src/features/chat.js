@@ -1,13 +1,15 @@
-// import api from "@/api";
+import api from "@/api";
 
-// export const sendMessageApi = async ({ message, threadId }) => {
-//   const response = await api.post("/api/chat", {
-//     message,
-//     ...(threadId ? { threadId } : {}),
-//   });
+export const chat = async (message) => {
+  try {
+    const {data} = await api.post("/api/chat", {
+      message,
+    });
 
-//   return response.data.data;
-// };
+    return data.aiMessage;
+  } catch (error) {
+return (error)  }
+};
 
 // export const agentChat = async ({ message, threadId, agentId }) => {
 //   const response = await api.post("/api/agent-chat", {
