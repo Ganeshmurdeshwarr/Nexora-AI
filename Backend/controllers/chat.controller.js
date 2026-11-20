@@ -1,5 +1,7 @@
 import { HumanMessage } from "@langchain/core/messages";
 import chatGraph from "../utils/chatGraph.js";
+import Agent from "../models/agent.model.js";
+import { createAgentGraph } from "../utils/agentGraph.js";
 
 export const chat = async (req, res) => {
   try {
@@ -41,3 +43,49 @@ export const chat = async (req, res) => {
     });
   }
 };
+
+export const agentChat = async (req, res) => {
+  try {
+    const { message ,agent } = req.body;
+   
+
+    if (!message.trim()) {
+      return res.status(400).json({
+        message: "Message is required.",
+      });
+    }
+
+    
+    const existingAgent = await Agent.findOne({name:agent})
+    const threadId = `${req.user._id.toString()}:${existingAgent?._id}`
+
+  
+
+    if(!existingAgent){
+      return res.status(400).json({message:"Agent not found"})
+    }
+
+    const graph = await createAgentGraph(existingAgent , req.user._id);
+    const result = await graph.invoke({
+       
+        messages: [new HumanMessage(message.trim())],
+      },
+      {
+        configurable: { thread_id:threadId },
+        recursionLimit:10
+      },
+    )
+    const lastMessage = result.messages.at(-1).content;
+ 
+    return res.status(200).json(
+      lastMessage,
+    );
+  } catch (error) {
+    console.error("agent chat error--:", error);
+    return res.status(502).json({
+      message: "Unable to generate an AI response.",
+    });
+  }
+};
+
+

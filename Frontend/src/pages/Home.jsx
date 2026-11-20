@@ -33,7 +33,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { clearUserData } from "@/redux/userSlice";
 import { setSelectedAgent } from "@/redux/agentSlice";
 import { Textarea } from "@/components/ui/textarea";
-import { chat } from "@/features/chat";
+import { agentChat, chat } from "@/features/chat";
 
 const hideScrollbar =
   "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
@@ -59,7 +59,7 @@ export default function Home() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage("")
+    setMessage("");
     setMessages((prev) => [
       ...prev,
       {
@@ -68,89 +68,36 @@ export default function Home() {
       },
     ]);
 
-    if (selectedAgent ==="") {
+    if (selectedAgent === "") {
       const res = await chat(message);
-      console.log(res)
+      console.log(res);
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content:
-         res|| res?.aiResponse ||
+            res ||
+            res?.aiResponse ||
+            res?.response?.data?.message ||
+            "Something went wrong",
+        },
+      ]);
+      return;
+    } else {
+      const res = await agentChat(message, selectedAgent);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            res ||
+            res?.aiResponse ||
             res?.response?.data?.message ||
             "Something went wrong",
         },
       ]);
       return;
     }
-
-    // setChatError("");
-    // setChatLoading(true);
-
-    // try {
-    //   let image = uploadedImage;
-    //   if (selectedImage && !image?.secure_url) {
-    //     image = await uploadImageToCloudinary();
-    //   }
-
-    //   // Attach the public image URL and description to the message so the agent/MCP tool
-    //   // can use the actual Cloudinary URL. The URL alone does not describe image contents.
-    //   let message = userPrompt || "Publish this image to my Instagram account.";
-    //   if (image?.secure_url) {
-    //     message += `\n\nImage URL: ${image.secure_url}`;
-    //     message += `\nImage public ID: ${image.public_id || ""}`;
-    //     if (imageDescription.trim()) {
-    //       message += `\nImage description: ${imageDescription.trim()}`;
-    //     }
-    //     message +=
-    //       "\nIf I asked to publish this on Instagram, prepare a caption and request approval before publishing.";
-    //   }
-
-    //   setMessages((previous) => [
-    //     ...previous,
-    //     {
-    //       role: "user",
-    //       content: message,
-    //       imageUrl: image?.secure_url || imagePreview || "",
-    //     },
-    //   ]);
-    //   setPrompt("");
-
-    //   const agentId = selectedAgent?._id ?? selectedAgent?.id;
-    //   const response = selectedAgent
-    //     ? await agentChat({ message, threadId, agentId })
-    //     : await sendMessageApi({ message, threadId });
-
-    //   const resolvedThreadId = response?.threadId ?? threadId;
-    //   if (resolvedThreadId) setThreadId(resolvedThreadId);
-
-    //   if (
-    //     (response?.requiresApproval || response?.interrupted) &&
-    //     createApprovalFromResponse(response, agentId, resolvedThreadId)
-    //   ) {
-    //     clearSelectedImage();
-    //     return;
-    //   }
-
-    //   setMessages((previous) => [
-    //     ...previous,
-    //     {
-    //       role: "assistant",
-    //       content: normalizeAssistantReply(
-    //         response?.reply ?? response?.message ?? "Done.",
-    //       ),
-    //     },
-    //   ]);
-    //   clearSelectedImage();
-    // } catch (error) {
-    //   setChatError(
-    //     error?.response?.data?.message ||
-    //       error?.message ||
-    //       "Unable to complete the request. Please try again.",
-    //   );
-    // } finally {
-    //   setChatLoading(false);
-    // }
   };
 
   const handleLogout = async () => {
@@ -420,23 +367,19 @@ export default function Home() {
                         side="top"
                         className={`mb-2 w-60 ${menuContent}`}
                       >
-                        
-                        { !agents?.length && (
+                        {!agents?.length && (
                           <DropdownMenuItem disabled className={menuItem}>
                             No agents found
                           </DropdownMenuItem>
                         )}
 
                         {agents?.map((agent, index) => {
-                      
                           return (
                             <DropdownMenuItem
                               key={index}
                               onClick={(e) => {
-                                
-                                  e.preventDefault();
-                                  dispatch(setSelectedAgent(agent?.name));
-                              
+                                e.preventDefault();
+                                dispatch(setSelectedAgent(agent?.name));
                               }}
                               className={`cursor-pointer gap-2 ${menuItem}`}
                             >

@@ -7,6 +7,7 @@ import { connectDB } from "./config/db.js";
 import authRouter from "./routes/auth.routes.js";
 import agentRouter from "./routes/agent.routes.js";
 import chatRouter from "./routes/chat.routes.js";
+import integrationRouter from "./routes/integration.route.js";
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ app.use(cookieParser());
 app.use("/api/auth",authRouter)
 app.use("/api/agents", agentRouter);
 app.use("/api/chat", chatRouter);
+app.use("/api/integrations", integrationRouter);
 
 
 app.listen(PORT, () => {
