@@ -12,6 +12,8 @@ import { decrypt } from "../config/encypt-decrypt.js";
 import { google } from "googleapis";
 import { connectDB } from "../config/db.js";
 import axios from "axios";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { HumanMessage } from "@langchain/core/messages";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({
@@ -682,6 +684,115 @@ Requirements:
       }
     }
   },
+);
+
+server.registerTool(
+  "analyze_image",
+  {
+   description: `
+Analyze an image using this tool.
+
+Use this tool whenever the user uploads or provides an image
+and asks a question about it, or simply wants to know what
+the image contains.
+
+Examples:
+- What is in this image?
+- Describe this image.
+- Explain this screenshot.
+- Read the text in this image.
+- Explain this code screenshot.
+
+IMPORTANT:
+- Analyze the image and answer the user's question.
+- If the user only uploads an image without a question,
+  describe the image and its important visible details.
+- Never suggest publishing the image to Instagram unless
+  the user explicitly asks to publish or post it.
+- This tool only analyzes images. It never publishes them.
+`,
+
+    inputSchema: z.object({
+      imageUrl: z
+        .string()
+        .url()
+        .refine((url) => url.startsWith("https://")),
+      prompt: z
+        .string()
+        .trim()
+        .min(1)
+        .max(2000)
+        .default("Describe this image clearly and accurately."),
+    }),
+  },
+
+  async ({ imageUrl, prompt }) => {
+    try {
+      
+          const imageResponse = await fetch(imageUrl);
+          if (!imageResponse.ok) {
+            throw new Error(
+              `Failed to fetch image . status: ${imageResponse.status}`,
+            );
+          }
+      
+          const arrayBuffer = await imageResponse.arrayBuffer();
+          const base64Image = Buffer.from(arrayBuffer).toString("base64");
+      
+          const contentType = imageResponse.headers.get("content-type");
+      
+          const imageAnalyzer = new ChatGoogleGenerativeAI({
+            model: "gemini-3.8-flash",
+            temperature: 0,
+            maxRetries: 2,
+            apiKey: process.env.GOOGLE_API_KEY,
+          });
+      
+          const message = new HumanMessage({
+            content: [
+              {
+                type: "text",
+                text: `${prompt} Describe this image clearly and accurately`,
+              },
+              {
+                type: "image_url",
+                image_url: `data:${contentType};base64,${base64Image}`,
+              },
+            ],
+          });
+          const response = await imageAnalyzer.invoke([message]);
+        
+           return{
+             content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              result: response?.content,
+            }),
+          },
+        ],
+           }
+        
+    } catch (error) {
+      console.error(
+        "Gemini image analysis failed:",
+        error.response?.data || error.message
+      );
+
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text",
+            text: `Image analysis failed: ${error}`
+              ,
+          },
+        ],
+      };
+    }
+  }
+
 );
 
 const main = async () => {

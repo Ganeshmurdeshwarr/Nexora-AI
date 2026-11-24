@@ -8,6 +8,7 @@ import authRouter from "./routes/auth.routes.js";
 import agentRouter from "./routes/agent.routes.js";
 import chatRouter from "./routes/chat.routes.js";
 import integrationRouter from "./routes/integration.route.js";
+import paymentRouter from "./routes/payment.routes.js";
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use("/api/auth",authRouter)
 app.use("/api/agents", agentRouter);
 app.use("/api/chat", chatRouter);
 app.use("/api/integrations", integrationRouter);
+app.use("/api/payments", paymentRouter);
 
 
 app.listen(PORT, () => {

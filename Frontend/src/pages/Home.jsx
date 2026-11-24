@@ -53,6 +53,7 @@ export default function Home() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { userData } = useSelector((state) => state.auth);
+  console.log(userData)
   const { agents, selectedAgent } = useSelector((state) => state.agent);
   const [message, setMessage] = useState("");
   const [logoutLoading, setLogoutLoading] = useState(false);
@@ -65,7 +66,7 @@ export default function Home() {
   const [uploadedImage, setUploadedImage] = useState(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [imageDescription, setImageDescription] = useState("");
-  const [aiLoading , setAiLoading] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleImageSelect = (event) => {
@@ -225,15 +226,15 @@ export default function Home() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setAiLoading(true)
+    setAiLoading(true);
 
     if (
       (!message.trim() && !selectedImage) ||
       approvalLoading ||
       logoutLoading ||
       pendingApproval
-    ){
-setAiLoading(false)
+    ) {
+      setAiLoading(false);
       return;
     }
 
@@ -273,7 +274,7 @@ setAiLoading(false)
             "Something went wrong",
         },
       ]);
-  setAiLoading(false)
+      setAiLoading(false);
       setMessage("");
       return;
     } else {
@@ -283,7 +284,7 @@ setAiLoading(false)
         clearSelectedImage();
         return;
       }
-            setAiLoading(false);
+      setAiLoading(false);
 
       setMessages((prev) => [
         ...prev,
@@ -301,11 +302,11 @@ setAiLoading(false)
     }
   };
 
-    const handleNewChat = () => {
+  const handleNewChat = () => {
     if (aiLoading || approvalLoading || pendingApproval) return;
     setMessages([]);
     setMessage("");
-    setSelectedImage(null);
+    clearSelectedImage();
   };
 
   const handleLogout = async () => {
@@ -315,8 +316,8 @@ setAiLoading(false)
       dispatch(clearUserData());
       navigate("/login", { replace: true });
     } catch (error) {
-     console.log(error)
-    } 
+      console.log(error);
+    }
   };
 
   const renderApprovalDetails = () => {
@@ -420,39 +421,39 @@ setAiLoading(false)
     try {
       const response = await agentResume({ approved, agent: selectedAgent });
 
-
       if (response?.interrupted && createPendingApproval(response)) {
         clearSelectedImage();
         return;
       }
-setMessage("")
+      setMessage("");
       setMessages((previous) => [
         ...previous,
         {
           role: "assistant",
-          content: response?.aiMessage || (approved
-          ? pendingApproval?.type === "instagram"
-          ? "Instagram publish workflow resumed. Verify the publish result above."
-          : "Approval process complete. Verify the action status."
-          : "Action rejected.")
+          content:
+            response?.aiMessage ||
+            (approved
+              ? pendingApproval?.type === "instagram"
+                ? "Instagram publish workflow resumed. Verify the publish result above."
+                : "Approval process complete. Verify the action status."
+              : "Action rejected."),
         },
       ]);
       setPendingApproval(null);
-      setApprovalLoading(false)
+      setApprovalLoading(false);
     } catch (error) {
       setMessages((previous) => [
         ...previous,
         {
           role: "assistant",
-          content:"approval failed" , error
-        
+          content: "approval failed",
+          error,
         },
       ]);
-       setPendingApproval(null);
-      setApprovalLoading(false)
+      setPendingApproval(null);
+      setApprovalLoading(false);
+    }
   };
-  }
-
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,#2b2f3a_0%,#191b21_55%,#121317_100%)] text-white">
@@ -486,6 +487,21 @@ setMessage("")
                 className={`w-56 ${menuContent}`}
               >
                 <DropdownMenuItem>
+                  <div
+                    to="/agents"
+                    className="flex items-center gap-2.5 py-2.5 hover:text-white"
+                  >
+                    <Coins size={16} color="yellow" />
+                    
+                      <span className="ml-2 text-sm font-medium">
+                        {userData?.credits} credits
+                      </span>
+                    
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className={menuSeparator} />
+
+                <DropdownMenuItem>
                   <Link
                     to="/agents"
                     className="flex items-center gap-2.5 py-2.5 hover:text-white"
@@ -515,6 +531,8 @@ setMessage("")
                     Integrations{" "}
                   </Link>
                 </DropdownMenuItem>
+                <DropdownMenuSeparator className={menuSeparator} />
+
                 <DropdownMenuItem asChild>
                   <Link
                     to="/pricing"
@@ -613,7 +631,13 @@ setMessage("")
                     <div
                       className={`max-w-[90%] wrap-break-word px-4 py-3 text-sm leading-7 sm:max-w-[80%] ${message.role === "user" ? `rounded-2xl rounded-br-md text-white ${darkPanel}` : "text-zinc-200"}`}
                     >
-                      {message?.image_url && <img src={message?.image_url} alt="Attached image" className="mb-3 max-h-64 rounded-lg object-contain" />}
+                      {message?.image_url && (
+                        <img
+                          src={message?.image_url}
+                          alt="Attached image"
+                          className="mb-3 max-h-64 rounded-lg object-contain"
+                        />
+                      )}
 
                       <p className="whitespace-pre-wrap">{message?.content}</p>
                     </div>
@@ -682,12 +706,18 @@ setMessage("")
                   </div>
                 )}
 
-                {aiLoading && <div className="flex items-center gap-3"><div className="grid size-8 place-items-center rounded-lg bg-white text-zinc-900">
-                  <Workflow size={15} className="animate-pulse" />
-                </div>
-                <div className="text-sm text-zinc-400">{imageUploading ? "Uploading image to Cloudinary..." : "Nexora AI is thinking..."}
-                </div>
-                </div>}
+                {aiLoading && (
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-8 place-items-center rounded-lg bg-white text-zinc-900">
+                      <Workflow size={15} className="animate-pulse" />
+                    </div>
+                    <div className="text-sm text-zinc-400">
+                      {imageUploading
+                        ? "Uploading image to Cloudinary..."
+                        : "Nexora AI is thinking..."}
+                    </div>
+                  </div>
+                )}
 
                 {/* {(chatError || agentsError) && <div className="rounded-xl border border-red-500/20 bg-red-500/8 px-4 py-3 text-sm text-red-300">{chatError || agentsError}</div>} */}
               </div>
@@ -728,7 +758,7 @@ setMessage("")
                   </div>
                 )}
                 <Textarea
-                  value={message }
+                  value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   // onKeyDown={(event) => {
                   //   if (

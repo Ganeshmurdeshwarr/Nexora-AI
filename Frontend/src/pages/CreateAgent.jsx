@@ -17,34 +17,34 @@ const fieldCls =
 
 const availableTools = [
   {
-    id: "web.search",
+    id: "web_search",
     name: "Web Search",
-    description: "Search for information on the web",
+    description: "Search the web for real-time information , news, tutorials, documents, and answers to your questions.",
   },
   {
-    id: "gmail.read",
-    name: "Read Emails",
-    description: "Read and summarize emails",
+    id: "list_gmail",
+    name: "Email Manager",
+    description: "Search and retrieve emails from your Gmail account, enabling you to manage your inbox and access important messages.",
   },
   {
-    id: "gmail.send",
+    id: "send_email",
     name: "Send Emails",
-    description: "Draft and send emails",
+    description: "Compose and send emails directly through your connected Gmail account.",
   },
   {
-    id: "event.schedule",
-    name: "schedule events",
-    description: "Schdule Events On Google Calender",
+    id: "create_calendar_event",
+    name: "Create Calendar Event",
+    description: "Create and manage events in your Google Calendar, including setting reminders and notifications.",
   },
   {
-    id: "image.analyze",
+    id: "image_analyze",
     name: "Analyze Image",
-    description: "analyze image",
+    description: "Analyze image to identify objects, text, and other visual elements and answers questions about the image.",
   },
   {
-    id: "post.instagram",
-    name: "Post on Instagram",
-    description: "publish Post on Instagram",
+    id: "publish_instagram_post",
+    name: "Instagram Publisher",
+    description: "Publish posts to your Instagram account, allowing you to share content and engage with your audience.",
   },
 ];
 

@@ -29,6 +29,7 @@ export const chat = async (req, res) => {
         configurable: { thread_id: threadId },
       },
     );
+    await deductCredits({ userId: req.user._id, credits: 2 });
 
     const lastMessage = data.messages.at(-1).content;
 
@@ -74,6 +75,8 @@ export const agentChat = async (req, res) => {
         recursionLimit: 10,
       },
     );
+        await deductCredits({ userId: req.user._id, credits: 10 });
+
     const lastMessage = result.messages.at(-1).content;
 
     return res.status(200).json({
@@ -109,7 +112,8 @@ try {
     const result  = await resumeAgentGraph({agent:existingAgent,threadId , userId,approved
 
     })
-    
+        await deductCredits({ userId: req.user._id, credits: 10 });
+
     return res.status(200).json(result)
 
 } catch (error) {

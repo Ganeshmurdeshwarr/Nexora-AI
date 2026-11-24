@@ -103,6 +103,11 @@ export const createAgentGraph = async (agent, userId) => {
     return tools?.find((tool) => names?.includes(tool.name));
   };
 
+  const enabledTool = new Set(agent?.tools || []);
+
+  const isToolEnabled = (tool) => enabledTool.has(tool);
+
+
   const mcpTools = await getMCPTools();
 
   const webSearchMcpTool = findTool(mcpTools, [
@@ -133,14 +138,15 @@ export const createAgentGraph = async (agent, userId) => {
     "nexora_publish_instagram_post",
     "publish_instagram_post",
   ]);
+  const analyzeImageMcpTool = findTool(mcpTools, [
+    "nexora_analyze_image",
+    "analyze_image",
+  ]);
 
-  
   const finalTools = [];
-  
-
 
   //  WEB SEARCH
-  if (webSearchMcpTool) {
+  if (webSearchMcpTool && isToolEnabled("web_search")) {
     finalTools.push(
       new DynamicStructuredTool({
         name: "web_search",
@@ -160,8 +166,43 @@ export const createAgentGraph = async (agent, userId) => {
     );
   }
 
+  if (analyzeImageMcpTool && isToolEnabled("image_analyze")) {
+    finalTools.push(
+      new DynamicStructuredTool({
+        name: "analyze_image",
+        description: `Analyze an image using the vision model.
+
+Use this tool when the user asks to explain, describe,
+inspect, or understand an image.
+
+Pass the publicly accessible image URL and the user's question.
+Return the actual analysis from the image, not guesses based on its URL.`,
+        schema: z.object({
+        imageUrl: z
+                .string()
+                .url()
+                .refine((url) => url.startsWith("https://")),
+              prompt: z
+                .string()
+                .trim()
+                .min(1)
+                .max(2000)
+                .default("Describe this image clearly and accurately."),
+        }),
+        func: async ({ imageUrl, prompt }) => {
+          try {
+            const result = await analyzeImageMcpTool.invoke({ imageUrl, prompt });
+            return result;
+          } catch (error) {
+            console.log(error);
+          }
+        },
+      }),
+    );
+  }
+
   // EMAIL
-  if (sendEmailMcpTool) {
+  if (sendEmailMcpTool && isToolEnabled("send_email")) {
     finalTools.push(
       new DynamicStructuredTool({
         name: "send_email",
@@ -202,7 +243,7 @@ The application will request explicit approval before sending the email.`,
     );
   }
 
-  if (listEmailsMcpTool) {
+  if (listEmailsMcpTool && isToolEnabled("list_gmail")) {
     finalTools.push(
       new DynamicStructuredTool({
         name: "list_emails",
@@ -269,7 +310,7 @@ Rules:
 
   // CALENDAR
 
-  if (createCalendarMcpTool) {
+  if (createCalendarMcpTool && isToolEnabled("create_calendar_event")) {
     finalTools.push(
       new DynamicStructuredTool({
         name: "create_calendar_event",
@@ -351,7 +392,7 @@ Rules:
     );
   }
 
-  if (listCalendarEventsMcpTool) {
+  if (listCalendarEventsMcpTool && isToolEnabled("list_calendar_events")) {
     finalTools.push(
       new DynamicStructuredTool({
         name: "list_calendar_events",
@@ -405,9 +446,9 @@ This is a read-only action and does not require approval.
     );
   }
 
-  // INSTAGRAm
+  // INSTAGRAM
 
-  if (publishOnInstagramMcpTool) {
+  if (publishOnInstagramMcpTool && isToolEnabled("publish_instagram_post")) {
     finalTools.push(
       new DynamicStructuredTool({
         name: "publish_instagram_post",
@@ -443,16 +484,20 @@ Requirements:
             .refine((url) => url.startsWith("https://"), {
               message: "Image URL must use HTTPS",
             })
-            .refine((url) => {
-              try {
-                const { pathname } = new URL(url);
-                return /\.(jpe?g|png|webp|bmp)$/i.test(pathname);
-              } catch {
-                return false;
-              }
-            }, {
-              message: "Image URL must be a direct JPEG, PNG, WEBP, or BMP image link",
-            })
+            .refine(
+              (url) => {
+                try {
+                  const { pathname } = new URL(url);
+                  return /\.(jpe?g|png|webp|bmp)$/i.test(pathname);
+                } catch {
+                  return false;
+                }
+              },
+              {
+                message:
+                  "Image URL must be a direct JPEG, PNG, WEBP, or BMP image link",
+              },
+            )
             .describe("Direct public HTTPS image URL"),
 
           caption: z
@@ -465,7 +510,6 @@ Requirements:
 
         func: async ({ imageUrl, caption }) => {
           try {
-           
             const authToken = makeAuthToken(userId);
             let finalCaption = caption?.trim() || "";
 
@@ -479,18 +523,16 @@ Requirements:
               }
             }
 
-
-
-              if (!finalCaption?.trim()) {
-      finalCaption = "Good morning! ☀️ Have a wonderful day! #GoodMorning #PositiveVibes";
-    }
+            if (!finalCaption?.trim()) {
+              finalCaption =
+                "Good morning! ☀️ Have a wonderful day! #GoodMorning #PositiveVibes";
+            }
 
             const result = await publishOnInstagramMcpTool.invoke({
               authToken,
               imageUrl,
               caption: finalCaption.trim(),
             });
-
 
             return result;
           } catch (error) {
@@ -501,8 +543,6 @@ Requirements:
       }),
     );
   }
-
-  
 
   const llmWithTools = llm.bindTools(finalTools);
 
@@ -593,6 +633,13 @@ IMAGE ANALYSIS RULES:
 7. If image analysis fails, explain the failure honestly.
 8. Never claim to have viewed an image if analysis failed.
 
+AVAILABLE TOOLS RULES:
+-You can only use tools provided to you through blindly.
+-Never attempt to use tools that are not available in the current context.
+-if a user asks you to use a tool that is not available, inform them that the tool is not available and suggest alternative actions or tools that can be used instead.
+-never pretend to execute a tool that is not available or provide false information about its capabilities.
+
+
 GENERAL RULES:
 - Be concise and helpful.
 - Infer parameters when sufficient context is available.
@@ -618,24 +665,22 @@ GENERAL RULES:
       }
     }
 
-    const recentMessages = state.messages
-      .slice(-4)
-      .map((message) => {
-        if (
-          (message instanceof ToolMessage || message.type === "tool") &&
-          !message.name
-        ) {
-          const name = toolNamesByCallId.get(message.tool_call_id);
-          if (!name) {
-            throw new Error(
-              `Tool response ${message.tool_call_id || "(unknown)"} has no matching tool name.`,
-            );
-          }
-          message = new ToolMessage({ ...message, name });
+    const recentMessages = state.messages.slice(-4).map((message) => {
+      if (
+        (message instanceof ToolMessage || message.type === "tool") &&
+        !message.name
+      ) {
+        const name = toolNamesByCallId.get(message.tool_call_id);
+        if (!name) {
+          throw new Error(
+            `Tool response ${message.tool_call_id || "(unknown)"} has no matching tool name.`,
+          );
         }
+        message = new ToolMessage({ ...message, name });
+      }
 
-        return limitMessageContext(message);
-      });
+      return limitMessageContext(message);
+    });
 
     const response = await llmWithTools.invoke([
       new SystemMessage(systemPrompt),
@@ -731,7 +776,6 @@ GENERAL RULES:
     }
 
     if (actionCall.name === "publish_instagram_post") {
-
       const { imageUrl, caption } = args;
 
       if (
