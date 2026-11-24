@@ -20,7 +20,7 @@ integrationRouter.get("/google/callback", googleCallback);
 integrationRouter.post("/google/disconnect", protect, disconnectGoogle);
 
 // Instagram Integration
-integrationRouter.get("/instagram/auth", protect, connectInstagram);
+integrationRouter.get("/instagram/connect",protect, connectInstagram);
 integrationRouter.get("/instagram/callback", instagramCallback);
 // integrationRouter.get("/instagram/status", protect, getInstagramStatus);
 integrationRouter.post("/instagram/disconnect", protect, disconnectInstagram);

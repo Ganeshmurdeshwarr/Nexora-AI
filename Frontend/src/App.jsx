@@ -11,6 +11,7 @@ import Agents from "./pages/Agents";
 import { chat } from "./features/chat";
 import {  setAgents, setAgentsLoading } from "./redux/agentSlice";
 import { getAllAgent } from "./features/agents/agentApi";
+import Pricing from "./pages/Pricing";
 
 function App() {
   const dispatch = useDispatch();
@@ -67,7 +68,9 @@ function App() {
 
           <Route path="/agents" element={userData ? <Agents/> : <Navigate to={ "/login"} /> } />
 
-          <Route path="/integration" element={userData ? <Integration/> : <Navigate to={ "/login"} /> } />
+          <Route path="/integrations" element={userData ? <Integration/> : <Navigate to={ "/login"} /> } />
+
+          <Route path="/pricing" element={userData ? <Pricing/> : <Navigate to={ "/login"} /> } />
 
           <Route path="/agents/new" element={userData ? <CreateAgent/> : <Navigate to={ "/login"} /> } />
         

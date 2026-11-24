@@ -33,7 +33,8 @@ import { useDispatch, useSelector } from "react-redux";
 import { clearUserData } from "@/redux/userSlice";
 import { setSelectedAgent } from "@/redux/agentSlice";
 import { Textarea } from "@/components/ui/textarea";
-import { agentChat, chat } from "@/features/chat";
+import { agentChat, agentResume, chat } from "@/features/chat";
+import { FaInstagram } from "react-icons/fa";
 
 const hideScrollbar =
   "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
@@ -56,21 +57,211 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [messages, setMessages] = useState([]);
+  const [pendingApproval, setPendingApproval] = useState(null);
+  const [approvalLoading, setApprovalLoading] = useState(false);
+
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [uploadedImage, setUploadedImage] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageDescription, setImageDescription] = useState("");
+  const [aiLoading , setAiLoading] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleImageSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Please select a valid image file",
+        },
+      ]);
+      return;
+    }
+
+    // if (file.size > MAX_IMAGE_SIZE) {
+    //   setChatError("Image must be 10 MB or smaller.");
+    //   event.target.value = "";
+    //   return;
+    // }
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setSelectedImage(file);
+    setImagePreview(URL.createObjectURL(file));
+    // setUploadedImage(null);
+  };
+
+  const uploadToCloudinary = async () => {
+    if (uploadedImage?.secure_url) return uploadedImage;
+    if (!selectedImage) return null;
+
+    const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const CLOUDINARY_UPLOAD_PRESET = import.meta.env
+      .VITE_CLOUDINARY_UPLOAD_PRESENT;
+
+    if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+      throw new Error(
+        "Cloudinary config missing. Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in frontend .env.",
+      );
+    }
+
+    setImageUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedImage);
+      formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+      formData.append("folder", "nexora-ai/instagram");
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: "POST", body: formData },
+      );
+      const data = await response.json();
+
+      if (!response.ok || !data?.secure_url) {
+        throw new Error(
+          data?.error?.message || "Cloudinary image upload failed.",
+        );
+      }
+
+      const image = {
+        secure_url: data?.secure_url,
+        public_id: data?.public_id,
+        width: data?.width,
+        height: data?.height,
+        format: data?.format,
+      };
+      setUploadedImage(image);
+      setImageUploading(false);
+      return image;
+    } catch (error) {
+      console.log(error);
+      setImageUploading(false);
+    }
+  };
+
+  const clearSelectedImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setSelectedImage(null);
+    setImagePreview("");
+    setUploadedImage(null);
+    setImageDescription("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const createPendingApproval = (response) => {
+    const approvalData = response.interrupts?.[0]?.value;
+    if (!approvalData) return false;
+
+    // const common = {
+    //   agentId: fallbackAgentId,
+    //   threadId: response?.threadId ?? fallbackThreadId,
+    // };
+
+    if (approvalData.type === "email_approval") {
+      setPendingApproval({
+        // ...common,
+        type: "email",
+        email: {
+          to: approvalData.email?.to ?? "",
+          subject: approvalData.email?.subject ?? "",
+          body: approvalData.email?.body ?? "",
+        },
+      });
+
+      setMessages((previous) => [
+        ...previous,
+        {
+          role: "assistant",
+          content: approvalData?.message || "Something went wrong",
+        },
+      ]);
+      return true;
+    }
+
+    if (approvalData.type === "calendar_event_approval") {
+      setPendingApproval({
+        // ...common,
+        type: "calendar",
+        event: {
+          summary: approvalData.event?.summary ?? "",
+          description: approvalData.event?.description ?? "",
+          startDateTime: approvalData.event?.startDateTime ?? "",
+          endDateTime: approvalData.event?.endDateTime ?? "",
+          timeZone: approvalData.event?.timeZone ?? "Asia/Kolkata",
+        },
+      });
+      setMessages((previous) => [
+        ...previous,
+        {
+          role: "assistant",
+          content: approvalData?.message || "Something went wrong",
+        },
+      ]);
+      return true;
+    }
+
+    if (approvalData?.type === "instagram_post_approval") {
+      setPendingApproval({
+        // ...common,
+        type: "instagram",
+        imageUrl: approvalData?.imageUrl ?? approvalData.image_url ?? "",
+        caption: approvalData.caption ?? "",
+      });
+      setMessages((previous) => [
+        ...previous,
+        {
+          role: "assistant",
+          content: approvalData?.message || "Something went wrong",
+        },
+      ]);
+      return true;
+    }
+    return false;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage("");
+    setAiLoading(true)
+
+    if (
+      (!message.trim() && !selectedImage) ||
+      approvalLoading ||
+      logoutLoading ||
+      pendingApproval
+    ){
+setAiLoading(false)
+      return;
+    }
+
+    let image = uploadedImage;
+
+    if (selectedImage && !image?.secure_url) {
+      setImageUploading(true);
+      image = await uploadToCloudinary();
+      setImageUploading(false);
+    }
+
+    let finalMessage = message;
+    if (image?.secure_url) {
+      finalMessage += `\n\nImage URL: ${image?.secure_url}`;
+      finalMessage += `\nImage public ID: ${image?.public_id}`;
+    }
+
     setMessages((prev) => [
       ...prev,
       {
         role: "user",
-        content: message || "Something went wrong",
+        content: finalMessage,
+        image_url: image?.secure_url,
       },
     ]);
 
     if (selectedAgent === "") {
       const res = await chat(message);
-      console.log(res);
       setMessages((prev) => [
         ...prev,
         {
@@ -82,22 +273,39 @@ export default function Home() {
             "Something went wrong",
         },
       ]);
+  setAiLoading(false)
+      setMessage("");
       return;
     } else {
-      const res = await agentChat(message, selectedAgent);
+      const res = await agentChat(finalMessage, selectedAgent);
+
+      if (res?.interrupted && createPendingApproval(res)) {
+        clearSelectedImage();
+        return;
+      }
+            setAiLoading(false);
+
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content:
-            res ||
-            res?.aiResponse ||
-            res?.response?.data?.message ||
+            res?.aiMessage ||
+            res?.aiMessage?.data?.message ||
             "Something went wrong",
         },
       ]);
+      setMessage("");
+
       return;
     }
+  };
+
+    const handleNewChat = () => {
+    if (aiLoading || approvalLoading || pendingApproval) return;
+    setMessages([]);
+    setMessage("");
+    setSelectedImage(null);
   };
 
   const handleLogout = async () => {
@@ -107,13 +315,144 @@ export default function Home() {
       dispatch(clearUserData());
       navigate("/login", { replace: true });
     } catch (error) {
-      setChatError(
-        error?.response?.data?.message || "Logout failed. Please try again.",
-      );
-    } finally {
-      setLogoutLoading(false);
-    }
+     console.log(error)
+    } 
   };
+
+  const renderApprovalDetails = () => {
+    if (!pendingApproval) return null;
+    if (pendingApproval?.type === "email") {
+      return (
+        <div className="space-y-3 rounded-xl border border-white/6 bg-black/20 p-3.5">
+          <div>
+            <p className="mb-1 text-xs text-zinc-500">To</p>
+            <p className="break-all text-sm">
+              {pendingApproval?.email?.to || "Not provided"}
+            </p>
+          </div>
+          <div>
+            <p className="mb-1 text-xs text-zinc-500">Subject</p>
+            <p className="text-sm">
+              {pendingApproval?.email?.subject || "No subject"}
+            </p>
+          </div>
+          <div>
+            <p className="mb-1 text-xs text-zinc-500">Message</p>
+            <p className="whitespace-pre-wrap break-words text-sm text-zinc-300">
+              {pendingApproval?.email?.body || "No message provided"}
+            </p>
+          </div>
+        </div>
+      );
+    }
+    if (pendingApproval.type === "calendar") {
+      const event = pendingApproval.event;
+      return (
+        <div className="space-y-3 rounded-xl border border-white/6 bg-black/20 p-3.5">
+          <div>
+            <p className="mb-1 text-xs text-zinc-500">Event title</p>
+            <p className="text-sm font-medium">
+              {event?.summary || "Untitled event"}
+            </p>
+          </div>
+          {event?.description && (
+            <div>
+              <p className="mb-1 text-xs text-zinc-500">Description</p>
+              <p className="whitespace-pre-wrap text-sm text-zinc-300">
+                {event.description}
+              </p>
+            </div>
+          )}
+          <div>
+            <p className="mb-1 text-xs text-zinc-500">Start</p>
+            <p className="flex items-center gap-2 text-sm">
+              <CalendarDays size={15} />
+              {event?.startDateTime
+                ? new Date(event?.startDateTime).toLocaleString("en-IN", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                    timeZone: event.timeZone,
+                  })
+                : "Not provided"}
+            </p>
+          </div>
+          <div>
+            <p className="mb-1 text-xs text-zinc-500">End</p>
+            <p className="flex items-center gap-2 text-sm">
+              <Clock size={15} />
+              {event.endDateTime
+                ? new Date(event.endDateTime).toLocaleString("en-IN", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                    timeZone: event.timeZone,
+                  })
+                : "Not provided"}
+            </p>
+          </div>
+          <p className="text-xs text-zinc-500">Timezone: {event?.timeZone}</p>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-3 rounded-xl border border-white/6 bg-black/20 p-3.5">
+        {pendingApproval?.imageUrl && (
+          <img
+            src={pendingApproval?.imageUrl}
+            alt="Instagram post preview"
+            className="max-h-72 w-full rounded-lg object-contain"
+          />
+        )}
+        <div>
+          <p className="mb-1 text-xs text-zinc-500">Caption</p>
+          <p className="whitespace-pre-wrap wrap-break-word text-sm text-zinc-200">
+            {pendingApproval?.caption || "No caption provided"}
+          </p>
+        </div>
+      </div>
+    );
+  };
+
+  const handleApproval = async (approved) => {
+    if (!pendingApproval || approvalLoading) return;
+
+    setApprovalLoading(true);
+
+    try {
+      const response = await agentResume({ approved, agent: selectedAgent });
+
+
+      if (response?.interrupted && createPendingApproval(response)) {
+        clearSelectedImage();
+        return;
+      }
+setMessage("")
+      setMessages((previous) => [
+        ...previous,
+        {
+          role: "assistant",
+          content: response?.aiMessage || (approved
+          ? pendingApproval?.type === "instagram"
+          ? "Instagram publish workflow resumed. Verify the publish result above."
+          : "Approval process complete. Verify the action status."
+          : "Action rejected.")
+        },
+      ]);
+      setPendingApproval(null);
+      setApprovalLoading(false)
+    } catch (error) {
+      setMessages((previous) => [
+        ...previous,
+        {
+          role: "assistant",
+          content:"approval failed" , error
+        
+        },
+      ]);
+       setPendingApproval(null);
+      setApprovalLoading(false)
+  };
+  }
+
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,#2b2f3a_0%,#191b21_55%,#121317_100%)] text-white">
@@ -174,6 +513,15 @@ export default function Home() {
                   >
                     <Settings2 size={16} />
                     Integrations{" "}
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/pricing"
+                    className="flex items-center gap-2.5 py-2.5"
+                  >
+                    <Coins size={16} />
+                    Pricing{" "}
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -263,36 +611,85 @@ export default function Home() {
                     )}
 
                     <div
-                      className={`max-w-[90%] break-words px-4 py-3 text-sm leading-7 sm:max-w-[80%] ${message.role === "user" ? `rounded-2xl rounded-br-md text-white ${darkPanel}` : "text-zinc-200"}`}
+                      className={`max-w-[90%] wrap-break-word px-4 py-3 text-sm leading-7 sm:max-w-[80%] ${message.role === "user" ? `rounded-2xl rounded-br-md text-white ${darkPanel}` : "text-zinc-200"}`}
                     >
-                      {/* {message.imageUrl && <img src={message.imageUrl} alt="Attached image" className="mb-3 max-h-64 rounded-lg object-contain" />} */}
+                      {message?.image_url && <img src={message?.image_url} alt="Attached image" className="mb-3 max-h-64 rounded-lg object-contain" />}
 
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="whitespace-pre-wrap">{message?.content}</p>
                     </div>
                   </div>
                 ))}
 
-                {/* {pendingApproval && (
+                {pendingApproval && (
                   <div className={`rounded-2xl p-4 ${darkPanel}`}>
                     <div className="mb-4 flex items-center gap-3">
-                      <div className={`flex size-10 items-center justify-center rounded-xl ${pendingApproval.type === "calendar" ? "bg-violet-400/10" : pendingApproval.type === "instagram" ? "bg-pink-400/10" : "bg-amber-400/10"}`}>
-                        {pendingApproval.type === "calendar" ? <CalendarDays className="size-5 text-violet-400" /> : pendingApproval.type === "instagram" ? <ImagePlus className="size-5 text-pink-400" /> : <Mail className="size-5 text-amber-400" />}
+                      <div
+                        className={`flex size-10 items-center justify-center rounded-xl ${pendingApproval.type === "calendar" ? "bg-violet-400/10" : pendingApproval.type === "instagram" ? "bg-pink-400/10" : "bg-amber-400/10"}`}
+                      >
+                        {pendingApproval?.type === "calendar" ? (
+                          <CalendarDays className="size-5 text-violet-400" />
+                        ) : pendingApproval.type === "instagram" ? (
+                          <FaInstagram className="size-5 text-pink-400" />
+                        ) : (
+                          <Mail className="size-5 text-amber-400" />
+                        )}
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold">{pendingApproval.type === "calendar" ? "Calendar Approval Required" : pendingApproval.type === "instagram" ? "Instagram Publish Approval" : "Email Approval Required"}</h3>
-                        <p className="text-xs text-zinc-400">{pendingApproval.type === "instagram" ? "Review the image and caption before publishing." : pendingApproval.type === "calendar" ? "Review the event before creating it." : "Review the email before sending."}</p>
+                        <h3 className="text-sm font-semibold">
+                          {pendingApproval.type === "calendar"
+                            ? "Calendar Approval Required"
+                            : pendingApproval.type === "instagram"
+                              ? "Instagram Publish Approval"
+                              : "Email Approval Required"}
+                        </h3>
+                        <p className="text-xs text-zinc-400">
+                          {pendingApproval.type === "instagram"
+                            ? "Review the image and caption before publishing."
+                            : pendingApproval.type === "calendar"
+                              ? "Review the event before creating it."
+                              : "Review the email before sending."}
+                        </p>
                       </div>
                     </div>
                     {renderApprovalDetails()}
                     <div className="mt-4 flex justify-end gap-2">
-                      <Button type="button" variant="outline" disabled={approvalLoading} onClick={() => handleApproval(false)} className="rounded-xl border-red-500/25 bg-transparent text-red-400 hover:bg-red-500/10 hover:text-red-300"><X className="mr-2 size-4" />{approvalLoading ? "Processing..." : "Reject"}</Button>
-                      <Button type="button" disabled={approvalLoading} onClick={() => handleApproval(true)} className={whiteBtn}><Check className="mr-2 size-4" />{approvalLoading ? "Processing..." : pendingApproval.type === "calendar" ? "Approve & Create" : pendingApproval.type === "instagram" ? "Approve & Publish" : "Approve & Send"}</Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={approvalLoading}
+                        onClick={() => handleApproval(false)}
+                        className="rounded-xl border-red-500/25 bg-transparent text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                      >
+                        <X className="mr-2 size-4" />
+                        {approvalLoading ? "Processing..." : "Reject"}
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={approvalLoading}
+                        onClick={() => handleApproval(true)}
+                        className={whiteBtn}
+                      >
+                        <Check className="mr-2 size-4" />
+                        {approvalLoading
+                          ? "Processing..."
+                          : pendingApproval.type === "calendar"
+                            ? "Approve & Create"
+                            : pendingApproval.type === "instagram"
+                              ? "Approve & Publish"
+                              : "Approve & Send"}
+                      </Button>
                     </div>
                   </div>
-                )} */}
+                )}
 
-                {/* {chatLoading && <div className="flex items-center gap-3"><div className="grid size-8 place-items-center rounded-lg bg-white text-zinc-900"><Workflow size={15} className="animate-pulse" /></div><div className="text-sm text-zinc-400">{imageUploading ? "Uploading image to Cloudinary..." : "AutoMate AI is thinking..."}</div></div>}
-                {(chatError || agentsError) && <div className="rounded-xl border border-red-500/20 bg-red-500/[0.08] px-4 py-3 text-sm text-red-300">{chatError || agentsError}</div>} */}
+                {aiLoading && <div className="flex items-center gap-3"><div className="grid size-8 place-items-center rounded-lg bg-white text-zinc-900">
+                  <Workflow size={15} className="animate-pulse" />
+                </div>
+                <div className="text-sm text-zinc-400">{imageUploading ? "Uploading image to Cloudinary..." : "Nexora AI is thinking..."}
+                </div>
+                </div>}
+
+                {/* {(chatError || agentsError) && <div className="rounded-xl border border-red-500/20 bg-red-500/8 px-4 py-3 text-sm text-red-300">{chatError || agentsError}</div>} */}
               </div>
             </div>
 
@@ -301,19 +698,37 @@ export default function Home() {
                 onSubmit={handleSubmit}
                 className={`mx-auto w-full max-w-2xl rounded-2xl p-3 transition-colors focus-within:border-white/25 ${darkPanel}`}
               >
-                {/* {imagePreview && (
+                {imagePreview && (
                   <div className="mb-3 flex items-start gap-3 rounded-xl border border-white/10 bg-black/20 p-2.5">
-                    <img src={imagePreview} alt="Selected upload preview" className="size-20 rounded-lg object-cover" />
+                    <img
+                      src={imagePreview}
+                      alt="Selected upload preview"
+                      className="size-20 rounded-lg object-cover"
+                    />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs text-zinc-300">{selectedImage?.name}</p>
-                      <p className="mt-1 text-[11px] text-zinc-500">{uploadedImage ? "Uploaded to Cloudinary" : "Will upload to Cloudinary when sent"}</p>
-                      <input value={imageDescription} onChange={(e) => setImageDescription(e.target.value)} placeholder="Image description (optional)" className="mt-2 w-full border-b border-white/10 bg-transparent py-1 text-xs text-white outline-none placeholder:text-zinc-500" />
+                      <p className="truncate text-xs text-zinc-300">
+                        {selectedImage?.name}
+                      </p>
+                      <p className="mt-1 text-[11px] text-zinc-500">
+                        {uploadedImage
+                          ? "Uploaded to Cloudinary"
+                          : "Will upload to Cloudinary when sent"}
+                      </p>
                     </div>
-                    <Button type="button" variant="ghost" size="icon" aria-label="Remove image" onClick={clearSelectedImage} className="size-8 text-zinc-400 hover:text-red-400"><Trash2 size={15} /></Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Remove image"
+                      onClick={clearSelectedImage}
+                      className="size-8 text-zinc-400 hover:text-red-400"
+                    >
+                      <Trash2 size={15} />
+                    </Button>
                   </div>
-                )} */}
+                )}
                 <Textarea
-                  value={message}
+                  value={message }
                   onChange={(event) => setMessage(event.target.value)}
                   // onKeyDown={(event) => {
                   //   if (
@@ -327,16 +742,17 @@ export default function Home() {
                   // }}
                   placeholder={
                     selectedAgent
-                      ? `Message ${selectedAgent.name}...`
+                      ? `Message ${selectedAgent}...`
                       : "Ask me anything..."
                   }
                   // disabled={isBusy || Boolean(pendingApproval)}
                   className={`min-h-20 resize-none border-0 !bg-transparent px-2 py-1.5 text-sm text-white shadow-none placeholder:text-zinc-500 focus-visible:ring-0 ${hideScrollbar}`}
                 />
-                {/* <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} /> */}
+
                 <div className="flex items-center justify-between gap-3 pt-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <Button
+                      onChange={(e) => uploadToCloudinary(e)}
                       type="button"
                       variant="ghost"
                       aria-label="Attach image"
@@ -345,6 +761,13 @@ export default function Home() {
                       onClick={() => fileInputRef.current?.click()}
                       className="size-8 rounded-lg text-zinc-300 hover:bg-white/10 hover:text-white"
                     >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleImageSelect(e)}
+                      />
                       <ImagePlus size={17} />
                     </Button>
                     <DropdownMenu>
@@ -422,18 +845,20 @@ export default function Home() {
                     </DropdownMenu>
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* <Button
+                    <Button
                       type="button"
+                      disabled={aiLoading || approvalLoading || imageUploading}
                       variant="ghost"
                       onClick={handleNewChat}
                       className="h-8 rounded-lg px-3 text-xs text-zinc-400 hover:bg-white/10 hover:text-white"
                     >
                       New chat
-                    </Button> */}
+                    </Button>
 
                     <Button
                       type="submit"
                       size="icon"
+                      disabled={aiLoading || approvalLoading || imageUploading}
                       onClick={(e) => handleSubmit(e)}
                       aria-label="Send message"
                       className={`size-8 shrink-0 ${whiteBtn} disabled:bg-white/10 disabled:text-zinc-500`}

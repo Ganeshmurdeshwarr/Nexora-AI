@@ -9,12 +9,12 @@ const getKey = () => {
     throw new Error("ENCRYPTION_KEY must be 64 hex characters");
   }
 
-  return key
+  return Buffer.from(key, "hex")
 };
 
 
 export const encrypt = (text) => {
-  const iv = crypto.randomBytes(12);
+  const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv("aes-256-gcm", getKey(), iv);
 
   const encrypted = Buffer.concat([

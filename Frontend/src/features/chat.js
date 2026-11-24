@@ -17,20 +17,17 @@ export const agentChat = async ( message, agent ) => {
     agent,
   });
 
-  console.log("Agent chat response:",data);
-
   return data;
 };
 
-// // Approve or reject an email
-// export const approveEmailApi = async ({ agentId, threadId, approved }) => {
-//   const response = await api.post("/api/agent-chat/approve-email", {
-//     agentId,
-//     threadId,
-//     approved,
-//   });
+// Approve or reject an email
+export const agentResume = async ({ agent, approved }) => {
+  const response = await api.post("/api/chat/agent/resume", {
+    agent,
+    approved,
+  });
 
-//   console.log("Email approval response:", response.data);
+  console.log("Email approval response:", response.data);
 
-//   return response.data.data;
-// };
+  return response?.data;
+};

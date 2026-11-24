@@ -13,6 +13,7 @@ import Integration from "../models/integration.model.js";
 // Connect Google account
 export const connectGoogle = async (req, res) => {
   try {
+  
     const userId = req.user?._id || req.user?.id;
 
     if (!userId) {
@@ -24,7 +25,7 @@ export const connectGoogle = async (req, res) => {
 
     const state = jwt.sign(
       {
-        userId:String(userId),
+        userId:userId,
         purpose: "google-oauth",
       },
       process.env.JWT_SECRET,
@@ -61,9 +62,7 @@ export const googleCallback = async (req, res) => {
       return res.status(400).send("Google authorization was cancelled");
     }
 
-    // if (typeof code !== "string" || typeof state !== "string") {
-    //   return res.status(400).send("Invalid OAuth callback");
-    // }
+    
 
     const decoded = jwt.verify(state, process.env.JWT_SECRET);
 
@@ -105,7 +104,7 @@ export const googleCallback = async (req, res) => {
 
     connection.services = [
       ...new Set([
-        ...Integration(connection.services || []),
+        ...(connection.services || []),
         "gmail",
         "google_calendar",
       ]),
@@ -162,6 +161,8 @@ const INSTAGRAM_GRAPH_VERSION = process.env.INSTAGRAM_GRAPH_VERSION || "v23.0";
 const INSTAGRAM_SCOPES = [
   "instagram_basic",
   "instagram_content_publish",
+  "pages_show_list",
+  "pages_read_engagement",
   
 ];
 
@@ -191,7 +192,7 @@ export const connectInstagram = async (req, res) => {
 
     const state = jwt.sign(
       {
-        userId:String(userId),
+        userId:userId,
         purpose: "instagram-oauth",
       },
       process.env.JWT_SECRET,
@@ -230,22 +231,19 @@ const url = `https://www.facebook.com/dialog/oauth?${params.toString()}`;
 // Instagram OAuth callback
 export const instagramCallback = async (req, res) => {
   try {
-    const { code, state, error, error_description } = req.query;
+    const { code, state, error } = req.query;
 
     if (error) {
       console.error(
-        "Instagram authorization error:",
-        error_description || error
+        "Instagram authorization error:", error
       );
 
-      return res.redirect(
-        `${process.env.CLIENT_URL}/?instagram=error`
-      );
+      // return res.redirect(
+      //   `${process.env.CLIENT_URL}/?instagram=error`
+      // );
     }
 
-    if (typeof code !== "string" || typeof state !== "string") {
-      return res.status(400).send("Invalid Instagram OAuth callback");
-    }
+  
 
     const decoded = jwt.verify(state, process.env.JWT_SECRET);
 
@@ -271,55 +269,50 @@ const userAccessToken = tokenResponse.data.access_token;
 
 
 const assignedAccounts = await axios.get(
-  `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}/me/assigned_instagram_account`,
+  `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}/me/assigned_instagram_accounts`,
   {
     params: {
-      fields: "id,username",
+      fields: "id,username,access_token,instagram_business_account",
       access_token: userAccessToken,
     },
     timeout: 15000,
   }
 );
 
-const instagramAccounts = assignedAccounts.data.data
+const instagramAccounts = assignedAccounts?.data?.data || []
 
 if(!instagramAccounts || instagramAccounts.length === 0){
-  console.error()
+  console.error("No assigned instagram  account for this user")
   return res.redirect(
       `${process.env.CLIENT_URL}/?instagram=error_no_account`
     );
 }
 
-const dynamicAccountId = instagramAccounts[0]
-
-    // Exchange authorization code for a short-lived access token.
-    // Exchange OAuth code for Meta access token
-
- // Verify the fixed Instagram account using its account ID.
-// const accountId = process.env.INSTAGRAM_ACCOUNT_ID;
-// const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
-
-if (!accountId || !accessToken) {
-  throw new Error("Instagram account credentials are missing.");
+const dynamicAccountId = instagramAccounts[0]?.id
+if(!dynamicAccountId){
+  console.log("Target Account payload layout lacks a valid unique ID property");
+  return res.status(400).json({message:'Invalid payload layout from Meta graph mapping parameters'})
 }
+
+
+
 
 const profile= await axios.get(
   `https://graph.facebook.com/${INSTAGRAM_GRAPH_VERSION}/${dynamicAccountId}`,
   {
     params: {
       fields: "id,username,name",
-      access_token: accessToken,
+      access_token: userAccessToken ,
     },
     timeout: 15000,
   }
 );
 
-// const profile = profileResponse.data;
 
 const filter = {
   userId: decoded.userId,
   provider: "instagram",
-  providerAccountId: String(profile.id),
+  providerAccountId: profile?.data?.id,
 };
 
 let connection = await Integration.findOne(filter)
@@ -334,22 +327,25 @@ if (!connection) {
 }
 
 connection.services = [
-  ...new Set([...Integration(connection.services || []), "instagram"]),
+  ...new Set([
+    ...(connection.services || []),
+   "instagram"
+]),
 ];
 
 connection.account = {
   ...connection.account?.toObject?.(),
-  username: profile.username,
-  displayName: profile.username|| profile.userName,
+  username: profile?.data?.username,
+  displayName: profile?.data?.username|| profile?.data?.userName,
 };
 connection.scopes = INSTAGRAM_SCOPES;
 
-if(tokens.access_token){
+if(userAccessToken){
   connection.tokens.accessToken = encrypt(userAccessToken);
 }
-if(tokens.expiry_date){
+
   connection.tokens.expiresAt = null;
-}
+
 
 connection.status = "connected";
 connection.connectedAt = new Date();
@@ -364,9 +360,7 @@ await connection.save();
       error.response?.data || error.message
     );
 
-    return res.redirect(
-      `${process.env.CLIENT_URL}/?instagram=error_no_account`
-    );
+   
   }
 };
 
@@ -480,7 +474,7 @@ export const disconnectInstagram = async (req, res) => {
       });
     }
 
-    const connection = await IntegrationConnection.findOne({
+    const connection = await Integration.findOne({
       userId,
       provider: "instagram",
     });
