@@ -3,6 +3,7 @@ import api from "@/api";
 export const login = async (token) => {
   try {
     const { data } = await api.post("/api/auth/login", { token });
+    console.log(data);
     return data;
   } catch (error) {
     console.log(error);
@@ -10,12 +11,8 @@ export const login = async (token) => {
 };
 
 export const logout = async () => {
-  try {
-    const { data } = await api.get("/api/auth/logout");
-    return data;
-  } catch (error) {
-    console.log(error);
-  }
+  const { data } = await api.get("/api/auth/logout");
+  return data;
 };
 
 export const me = async () => {

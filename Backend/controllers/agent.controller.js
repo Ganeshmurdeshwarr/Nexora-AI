@@ -62,15 +62,13 @@ export const getAgentById = async (req, res) => {
   try {
     const agentId = req.params.id;
 
-    if (!mongoose.isValidObjectId(id)) {
+    if (!mongoose.isValidObjectId(agentId)) {
       return res.status(400).json({
         message: "Invalid agent ID.",
       });
     }
 
-    const agent = await Agent.findById({
-      agentId,
-    });
+    const agent = await Agent.findById(agentId);
 
     if (!agent) {
       return res.status(404).json({

@@ -51,6 +51,19 @@ function getHeader(headers = [], name) {
   return header?.value || "";
 }
 
+const errorResponse = (message) => ({
+  isError: true,
+  content: [
+    {
+      type: "text",
+      text: JSON.stringify({
+        success: false,
+        message,
+      }),
+    },
+  ],
+});
+
 const getGoogleOAuthClient = async (userId, requiredService) => {
   await connectDB();
 
@@ -576,11 +589,7 @@ Requirements:
 
   finalImageUrl = finalImageUrl.replace(/\.webp$/, ".jpg")
     }
-      // const requestConfig = {
-      //   timeout: 30000,
-      // };
-
-      // 7. Create the media container.
+      
 
       const imageCheck = await axios.head(finalImageUrl);
 
@@ -590,7 +599,6 @@ Requirements:
         `${graphUrl}/${integration?.providerAccountId}/media`,
         null,
         {
-          // ...requestConfig,
           params: {
             image_url: finalImageUrl,
             caption:caption || "",
@@ -606,7 +614,6 @@ Requirements:
         throw new Error("Instagram did not return a media container ID.");
       }
 
-      // 8. Wait until Instagram finishes processing.
       let isReady = false;
 
       for (let attempt = 0; attempt < 10; attempt++) {
@@ -645,12 +652,10 @@ Requirements:
       }
       }
 
-      // 9. Publish the image.
       const publishResponse = await axios.post(
         `${graphUrl}/${integration.providerAccountId}/media_publish`,
         null,
         {
-          // ...requestConfig,
           params: {
             creation_id: creationId,
             access_token,
@@ -658,7 +663,6 @@ Requirements:
         },
       );
 
-      // 10. Return the result to the AI agent.
       return {
         content: [
           {
@@ -673,8 +677,6 @@ Requirements:
         ],
       };
     } catch (error) {
-      console.log( "Instagram API error:",
-    error.response?.data || error.message );
       return {content: [
           {
             type: "text",
@@ -804,6 +806,6 @@ const main = async () => {
 };
 
 main().catch((error) => {
-  console.log("MCP Server error", error);
+  console.error("MCP Server error", error);
   process.exit(1);
 });

@@ -31,10 +31,14 @@ app.use("/api/integrations", integrationRouter);
 app.use("/api/payments", paymentRouter);
 
 
-app.listen(PORT, () => {
-  console.log(`Nexora AI API running at ${PORT}`);
-
-  connectDB().catch((error) => {
-    console.error("MongoDB connection failed:", error.message);
+const startServer = async () => {
+  await connectDB();
+  app.listen(PORT, () => {
+    console.log(`Nexora AI API running at ${PORT}`);
   });
+};
+
+startServer().catch((error) => {
+  console.error("API startup failed:", error.message);
+  process.exitCode = 1;
 });

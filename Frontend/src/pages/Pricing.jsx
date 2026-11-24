@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import axios from "axios";
 import {
   Check,
   Zap,
@@ -9,10 +8,10 @@ import {
   ArrowRight,
   Sparkles,
   Loader2,
-  Workflow,
   ArrowLeft,
 } from "lucide-react";
 
+import infinityLogo from "@/assets/Infinity Logo.png";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,9 +25,11 @@ import {
 import { Separator } from "@/components/ui/separator";
 
 import { toast } from "sonner";
-import api from "@/api";
 import { Link } from "react-router-dom";
+import { useDispatch } from "react-redux";
 import { createPayment, verify } from "@/features/payment";
+import { me } from "@/features/auth";
+import { setUserData } from "@/redux/userSlice";
 
 const plans = [
   {
@@ -90,6 +91,7 @@ const cardBase = "border border-white/10 bg-white/[0.03]";
 
 function Pricing() {
   const [loading, setLoading] = useState(false);
+  const dispatch = useDispatch();
 
   const handlePurchase = async (planId) => {
     if (planId === "starter") return;
@@ -114,10 +116,12 @@ function Pricing() {
         order_id: order.id,
         handler: async (response) => {
           try {
-            const data= await verify( response );
+            const data = await verify(response);
+            const userData = await me();
+            if (userData) dispatch(setUserData(userData));
 
             toast.success(
-              verifyData.message || "Payment verified successfully!"
+              data.message || "Payment verified successfully!"
             );
 
           } catch (error) {
@@ -125,7 +129,9 @@ function Pricing() {
               error.response?.data?.message ||
                 "Payment verification failed. Please contact support if money was deducted."
             );
-          } 
+          } finally {
+            setLoading(false);
+          }
         },
 
       
@@ -137,9 +143,11 @@ function Pricing() {
         toast.error(
           response.error?.description || "Payment failed. Please try again."
         );
+        setLoading(false);
       });
 
       razorpay.open();
+      setLoading(false);
     } catch (error) {
       console.error("Purchase error:", error);
 
@@ -164,9 +172,11 @@ function Pricing() {
         <header>
           <div className="mx-auto flex h-16 max-w-8xl items-center justify-between px-4 sm:px-6">
             <Link to="/" className="flex items-center gap-2.5">
-              <span className="grid size-8 place-items-center rounded-lg bg-white text-zinc-900 shadow-[0_4px_14px_rgba(255,255,255,0.15)]">
-                <Workflow className="size-[17px]" />
-              </span>
+              <img
+                src={infinityLogo}
+                alt="Nexora AI"
+                className="size-8 rounded-lg object-cover"
+              />
               <span className="text-sm font-medium tracking-tight text-zinc-100">
                 AutoMate AI
               </span>
@@ -205,8 +215,7 @@ function Pricing() {
           <div className="grid items-stretch gap-5 pt-3 md:grid-cols-3">
             {plans.map((plan) => {
               const Icon = plan.icon;
-              const isLoading = loadingPlan === plan.id;
-              const isAnyPlanLoading = loadingPlan !== null;
+             
 
               return (
                 <div key={plan.id} className="relative flex">
@@ -290,7 +299,7 @@ function Pricing() {
 
                     <CardFooter className="border-0 bg-transparent! px-6 pb-6 pt-0">
                       <Button
-                        disabled={plan?.disabled || isAnyPlanLoading}
+                        disabled={plan?.disabled || loading}
                         onClick={() => handlePurchase(plan.id)}
                         className={`h-11 w-full rounded-xl disabled:opacity-100 ${
                           plan.popular
@@ -299,7 +308,7 @@ function Pricing() {
                         }`}
                         variant={plan?.popular ? "default" : "outline"}
                       >
-                        {isLoading ? (
+                        {loading ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Processing...

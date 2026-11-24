@@ -47,19 +47,3 @@ export default chatGraph
 
 
 
-// export const getChatGraph = async () => {
-//   if (!chatGraphPromise) {
-//     chatGraphPromise = (async () => {
-//       const checkpointer = await getCheckpointer();
-
-//       return builder.compile({
-//         checkpointer,
-//       });
-//     })().catch((error) => {
-//       chatGraphPromise = undefined;
-//       throw error;
-//     });
-//   }
-
-//   return chatGraphPromise;
-// };

@@ -95,6 +95,7 @@ export const me = async (req, res) => {
         name: req.user.name,
         email: req.user.email,
         profilePicture: req.user.profilePicture,
+        credits: req.user.credits,
       }
     return res.status(200).json( user);
   } catch (error) {

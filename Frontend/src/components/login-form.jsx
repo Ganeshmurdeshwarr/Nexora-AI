@@ -40,7 +40,7 @@ export function LoginForm({ className, ...props }) {
       const token = await result.user.getIdToken();
 
       const data=await login(token);
-      dispatch(setUserData(data.user))
+      dispatch(setUserData(data))
       navigate("/", { replace: true });
     } catch (err) {
       console.error("Google login failed:", err);

@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 
 const integrationSchema = new mongoose.Schema(
   {
-    // AutoMate AI ka logged-in user
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -97,17 +96,6 @@ const integrationSchema = new mongoose.Schema(
   }
 );
 
-
-// integrationSchema.index(
-//   {
-//     userId: 1,
-//     provider: 1,
-//     providerAccountId: 1,
-//   },
-//   {
-//     unique: true,
-//   }
-// );
 
 const Integration = mongoose.model(
   "Integration",

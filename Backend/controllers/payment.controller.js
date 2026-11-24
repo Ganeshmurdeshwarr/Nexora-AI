@@ -2,6 +2,7 @@
 import razorpay from "../config/razorpay.js";
 
 import crypto from "crypto";
+import mongoose from "mongoose";
 import Payment from "../models/payment.model.js";
 import User from "../models/user.model.js";
 
@@ -9,18 +10,17 @@ import User from "../models/user.model.js";
 const Plans = {
   pro: {
     name: "Pro",
-    amount: 29900, // ₹299
+    amount: 29900, 
     credits: 500,
   },
 
   team: {
     name: "Team",
-    amount: 79900, // ₹799
+    amount: 79900, 
     credits: 2000,
   },
 };
 
-// CREATE ORDER
 export const createOrder = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -40,7 +40,6 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    // Create Razorpay order
     const order = await razorpay.orders.create({
       amount: selectedPlan.amount,
       currency: "INR",
@@ -48,7 +47,6 @@ export const createOrder = async (req, res) => {
       notes: { userId, plan },
     });
 
-    // Save payment in database
     await Payment.create({
       userId,
       plan,
@@ -80,7 +78,6 @@ export const createOrder = async (req, res) => {
   }
 };
 
-// VERIFY PAYMENT
 export const verify = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -98,16 +95,18 @@ export const verify = async (req, res) => {
     } = req.body;
 
     if (
+      typeof razorpay_order_id !== "string" ||
+      typeof razorpay_payment_id !== "string" ||
+      typeof razorpay_signature !== "string" ||
       !razorpay_order_id ||
       !razorpay_payment_id ||
-      !razorpay_signature
+      !/^[a-f\d]{64}$/i.test(razorpay_signature)
     ) {
       return res.status(400).json({
         message: "Payment verification details are required",
       });
     }
 
-    // Find the payment belonging to this user
     const payment = await Payment.findOne({
       userId,
       razorpayOrderId: razorpay_order_id,
@@ -119,20 +118,17 @@ export const verify = async (req, res) => {
       });
     }
 
-    // Prevent duplicate credit grants
     if (payment.status === "paid") {
       return res.status(200).json({
         message: "Payment already verified",
       });
     }
 
-    // Generate expected signature
     const generatedSignature = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest("hex");
 
-    // Compare signatures safely
     const received = Buffer.from(razorpay_signature, "hex");
     const expected = Buffer.from(generatedSignature, "hex");
 
@@ -145,44 +141,97 @@ export const verify = async (req, res) => {
       });
     }
 
-    // // Verify payment status with Razorpay
-    // const razorpayPayment = await razorpay.payments.fetch(
-    //   razorpay_payment_id
-    // );
+    let gatewayPayment = await razorpay.payments.fetch(razorpay_payment_id);
 
-    // if (
-    //   razorpayPayment.order_id !== razorpay_order_id ||
-    //   razorpayPayment.amount !== payment.amount ||
-    //   razorpayPayment.currency !== payment.currency ||
-    //   razorpayPayment.status !== "captured"
-    // ) {
-    //   return res.status(400).json({
-    //     message: "Payment is not captured or details do not match",
-    //   });
-    // }
-
-    // Mark payment as paid before adding credits
-    payment.status = "paid";
-    payment.razorpayPaymentId = razorpay_payment_id;
-
-    await payment.save();
-
-    // Add purchased credits
-   const user = await User.findByIdAndUpdate(
-    userId,
-    {
-      $inc: {
-        credits: payment.credits,
-      },
-    },
-    {
-      new: true,
+    if (
+      gatewayPayment.order_id !== razorpay_order_id ||
+      gatewayPayment.amount !== payment.amount ||
+      gatewayPayment.currency !== payment.currency
+    ) {
+      return res.status(400).json({
+        message: "Payment details do not match the order",
+      });
     }
-  );
 
-  if (!user) {
-    throw new Error("User not found");
-  }
+    if (gatewayPayment.status === "authorized") {
+      gatewayPayment = await razorpay.payments.capture(
+        razorpay_payment_id,
+        payment.amount,
+        payment.currency,
+      );
+    }
+
+    if (gatewayPayment.status !== "captured") {
+      return res.status(409).json({
+        message: "Payment has not been captured",
+      });
+    }
+
+    const session = await mongoose.startSession();
+    let alreadyVerified = false;
+
+    try {
+      await session.withTransaction(async () => {
+        alreadyVerified = false;
+
+        const updatedPayment = await Payment.findOneAndUpdate(
+          {
+            _id: payment._id,
+            userId,
+            status: "created",
+          },
+          {
+            $set: {
+              status: "paid",
+              razorpayPaymentId: razorpay_payment_id,
+            },
+          },
+          {
+            returnDocument: "after",
+            session,
+          },
+        );
+
+        if (!updatedPayment) {
+          const currentPayment = await Payment.findById(payment._id).session(
+            session,
+          );
+
+          if (currentPayment?.status === "paid") {
+            alreadyVerified = true;
+            return;
+          }
+
+          throw new Error("Payment status changed before verification");
+        }
+
+        const user = await User.findByIdAndUpdate(
+          userId,
+          {
+            $inc: {
+              credits: updatedPayment.credits,
+            },
+          },
+          {
+            returnDocument: "after",
+            runValidators: true,
+            session,
+          },
+        );
+
+        if (!user) {
+          throw new Error("User not found");
+        }
+      });
+    } finally {
+      await session.endSession();
+    }
+
+    if (alreadyVerified) {
+      return res.status(200).json({
+        message: "Payment already verified",
+      });
+    }
 
     return res.status(200).json({
       message: "Payment verified successfully",

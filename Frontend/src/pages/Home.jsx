@@ -14,13 +14,12 @@ import {
   Plus,
   Settings,
   UserRound,
-  Workflow,
   X,
   Trash2,
   Settings2,
 } from "lucide-react";
 
-import { logout } from "@/features/auth.js";
+import { logout, me } from "@/features/auth.js";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -30,11 +29,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useDispatch, useSelector } from "react-redux";
-import { clearUserData } from "@/redux/userSlice";
+import { clearUserData, setUserData } from "@/redux/userSlice";
 import { setSelectedAgent } from "@/redux/agentSlice";
 import { Textarea } from "@/components/ui/textarea";
 import { agentChat, agentResume, chat } from "@/features/chat";
 import { FaInstagram } from "react-icons/fa";
+import infinityLogo from "@/assets/Infinity Logo.png";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const hideScrollbar =
   "[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
@@ -49,14 +51,31 @@ const iconBtn =
 const whiteBtn =
   "rounded-xl border-0 bg-white text-zinc-900 hover:bg-zinc-200 hover:text-zinc-900";
 
+const getMessageText = (content) => {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => (typeof item === "string" ? item : item?.text || ""))
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (content && typeof content === "object") {
+    return content.text || content.message || JSON.stringify(content, null, 2);
+  }
+  return content == null ? "" : String(content);
+};
+
 export default function Home() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const { userData } = useSelector((state) => state.auth);
-  console.log(userData)
   const { agents, selectedAgent } = useSelector((state) => state.agent);
   const [message, setMessage] = useState("");
+  const [conversationId, setConversationId] = useState(() =>
+    globalThis.crypto.randomUUID(),
+  );
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
   const [messages, setMessages] = useState([]);
   const [pendingApproval, setPendingApproval] = useState(null);
   const [approvalLoading, setApprovalLoading] = useState(false);
@@ -68,6 +87,11 @@ export default function Home() {
   const [imageDescription, setImageDescription] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const fileInputRef = useRef(null);
+
+  const refreshUserData = async () => {
+    const freshUserData = await me();
+    if (freshUserData) dispatch(setUserData(freshUserData));
+  };
 
   const handleImageSelect = (event) => {
     const file = event.target.files?.[0];
@@ -84,15 +108,10 @@ export default function Home() {
       return;
     }
 
-    // if (file.size > MAX_IMAGE_SIZE) {
-    //   setChatError("Image must be 10 MB or smaller.");
-    //   event.target.value = "";
-    //   return;
-    // }
+   
     if (imagePreview) URL.revokeObjectURL(imagePreview);
     setSelectedImage(file);
     setImagePreview(URL.createObjectURL(file));
-    // setUploadedImage(null);
   };
 
   const uploadToCloudinary = async () => {
@@ -101,7 +120,7 @@ export default function Home() {
 
     const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
     const CLOUDINARY_UPLOAD_PRESET = import.meta.env
-      .VITE_CLOUDINARY_UPLOAD_PRESENT;
+      .VITE_CLOUDINARY_UPLOAD_PRESET;
 
     if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
       throw new Error(
@@ -136,10 +155,8 @@ export default function Home() {
         format: data?.format,
       };
       setUploadedImage(image);
-      setImageUploading(false);
       return image;
-    } catch (error) {
-      console.log(error);
+    } finally {
       setImageUploading(false);
     }
   };
@@ -157,14 +174,9 @@ export default function Home() {
     const approvalData = response.interrupts?.[0]?.value;
     if (!approvalData) return false;
 
-    // const common = {
-    //   agentId: fallbackAgentId,
-    //   threadId: response?.threadId ?? fallbackThreadId,
-    // };
 
     if (approvalData.type === "email_approval") {
       setPendingApproval({
-        // ...common,
         type: "email",
         email: {
           to: approvalData.email?.to ?? "",
@@ -185,7 +197,6 @@ export default function Home() {
 
     if (approvalData.type === "calendar_event_approval") {
       setPendingApproval({
-        // ...common,
         type: "calendar",
         event: {
           summary: approvalData.event?.summary ?? "",
@@ -207,7 +218,6 @@ export default function Home() {
 
     if (approvalData?.type === "instagram_post_approval") {
       setPendingApproval({
-        // ...common,
         type: "instagram",
         imageUrl: approvalData?.imageUrl ?? approvalData.image_url ?? "",
         caption: approvalData.caption ?? "",
@@ -226,79 +236,96 @@ export default function Home() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setAiLoading(true);
 
     if (
+      aiLoading ||
       (!message.trim() && !selectedImage) ||
       approvalLoading ||
       logoutLoading ||
       pendingApproval
     ) {
-      setAiLoading(false);
       return;
     }
 
-    let image = uploadedImage;
+    setAiLoading(true);
 
-    if (selectedImage && !image?.secure_url) {
-      setImageUploading(true);
-      image = await uploadToCloudinary();
-      setImageUploading(false);
-    }
+    try {
+      let image = uploadedImage;
 
-    let finalMessage = message;
-    if (image?.secure_url) {
-      finalMessage += `\n\nImage URL: ${image?.secure_url}`;
-      finalMessage += `\nImage public ID: ${image?.public_id}`;
-    }
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "user",
-        content: finalMessage,
-        image_url: image?.secure_url,
-      },
-    ]);
-
-    if (selectedAgent === "") {
-      const res = await chat(message);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            res ||
-            res?.aiResponse ||
-            res?.response?.data?.message ||
-            "Something went wrong",
-        },
-      ]);
-      setAiLoading(false);
-      setMessage("");
-      return;
-    } else {
-      const res = await agentChat(finalMessage, selectedAgent);
-
-      if (res?.interrupted && createPendingApproval(res)) {
-        clearSelectedImage();
-        return;
+      if (selectedImage && !image?.secure_url) {
+        setImageUploading(true);
+        image = await uploadToCloudinary();
       }
-      setAiLoading(false);
 
+      let finalMessage = message;
+      if (image?.secure_url) {
+        finalMessage += `\n\nImage URL: ${image?.secure_url}`;
+        finalMessage += `\nImage public ID: ${image?.public_id}`;
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "user",
+          content: finalMessage,
+          image_url: image?.secure_url,
+        },
+      ]);
+
+      if (selectedAgent === "") {
+        const res = await chat(finalMessage, conversationId);
+        await refreshUserData();
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              res ||
+              res?.aiResponse ||
+              res?.response?.data?.message ||
+              "Something went wrong",
+          },
+        ]);
+      } else {
+        const res = await agentChat(
+          finalMessage,
+          selectedAgent,
+          conversationId,
+        );
+        await refreshUserData();
+
+        if (res?.interrupted && createPendingApproval(res)) {
+          clearSelectedImage();
+          return;
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              res?.aiMessage ||
+              res?.aiMessage?.data?.message ||
+              "Something went wrong",
+          },
+        ]);
+      }
+
+      setMessage("");
+    } catch (error) {
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content:
-            res?.aiMessage ||
-            res?.aiMessage?.data?.message ||
-            "Something went wrong",
+            error?.response?.data?.message ||
+            error?.message ||
+            "Unable to send your message. Please try again.",
         },
       ]);
-      setMessage("");
-
-      return;
+    } finally {
+      setAiLoading(false);
+      setImageUploading(false);
     }
   };
 
@@ -306,17 +333,25 @@ export default function Home() {
     if (aiLoading || approvalLoading || pendingApproval) return;
     setMessages([]);
     setMessage("");
+    setConversationId(globalThis.crypto.randomUUID());
     clearSelectedImage();
   };
 
   const handleLogout = async () => {
     try {
       setLogoutLoading(true);
+      setLogoutError("");
       await logout();
       dispatch(clearUserData());
       navigate("/login", { replace: true });
     } catch (error) {
-      console.log(error);
+      setLogoutError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Logout failed. Please try again.",
+      );
+    } finally {
+      setLogoutLoading(false);
     }
   };
 
@@ -339,7 +374,7 @@ export default function Home() {
           </div>
           <div>
             <p className="mb-1 text-xs text-zinc-500">Message</p>
-            <p className="whitespace-pre-wrap break-words text-sm text-zinc-300">
+            <p className="whitespace-pre-wrap wrap-break-word text-sm text-zinc-300">
               {pendingApproval?.email?.body || "No message provided"}
             </p>
           </div>
@@ -419,7 +454,12 @@ export default function Home() {
     setApprovalLoading(true);
 
     try {
-      const response = await agentResume({ approved, agent: selectedAgent });
+      const response = await agentResume({
+        approved,
+        agent: selectedAgent,
+        conversationId,
+      });
+      await refreshUserData();
 
       if (response?.interrupted && createPendingApproval(response)) {
         clearSelectedImage();
@@ -440,17 +480,18 @@ export default function Home() {
         },
       ]);
       setPendingApproval(null);
-      setApprovalLoading(false);
     } catch (error) {
       setMessages((previous) => [
         ...previous,
         {
           role: "assistant",
-          content: "approval failed",
-          error,
+          content:
+            error?.response?.data?.message ||
+            error?.message ||
+            "Approval failed. Please try again.",
         },
       ]);
-      setPendingApproval(null);
+    } finally {
       setApprovalLoading(false);
     }
   };
@@ -464,9 +505,11 @@ export default function Home() {
       <div className="relative z-10 flex min-h-0 flex-1 flex-col">
         <header className="z-30 flex h-16 shrink-0 items-center justify-between px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2.5">
-            <span className="grid size-8 place-items-center rounded-lg bg-white text-zinc-900">
-              <Workflow size={17} />
-            </span>
+            <img
+              src={infinityLogo}
+              alt="Nexora AI"
+              className="size-8 rounded-lg object-cover"
+            />
             <span className="text-sm font-medium tracking-tight">
               Nexora AI
             </span>
@@ -479,7 +522,11 @@ export default function Home() {
                   aria-label="Open menu"
                   className={iconBtn}
                 >
-                  <Workflow size={16} />
+                  <img
+                    src={infinityLogo}
+                    alt=""
+                    className="size-6 rounded-md object-cover"
+                  />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -596,14 +643,24 @@ export default function Home() {
         </header>
 
         <main className="flex min-h-0 flex-1 flex-col">
+          {logoutError && (
+            <p
+              role="alert"
+              className="mx-auto mt-3 w-full max-w-4xl rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+            >
+              {logoutError}
+            </p>
+          )}
           <section className="flex min-h-0 flex-1 flex-col">
             <div className={`min-h-0 flex-1 overflow-y-auto ${hideScrollbar}`}>
-              <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col gap-5 px-4 py-8 sm:px-6">
+              <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col gap-5 px-4 py-8 sm:px-6">
                 {messages.length === 0 && (
                   <div className="flex flex-1 flex-col items-center justify-center pb-8 text-center">
-                    <div className="mb-7 grid size-14 place-items-center rounded-2xl bg-white text-zinc-900">
-                      <Workflow size={26} />
-                    </div>
+                    <img
+                      src={infinityLogo}
+                      alt="Nexora AI"
+                      className="mb-7 size-14 rounded-2xl object-cover"
+                    />
                     <p className="text-base text-violet-300/80">
                       Hi, {userData.name || "User"}
                     </p>
@@ -623,9 +680,11 @@ export default function Home() {
                     className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                   >
                     {message.role === "assistant" && (
-                      <div className="mr-3 mt-1 grid size-8 shrink-0 place-items-center rounded-lg bg-white text-zinc-900">
-                        <Workflow size={15} />
-                      </div>
+                      <img
+                        src={infinityLogo}
+                        alt=""
+                        className="mr-3 mt-1 size-8 shrink-0 rounded-lg object-cover"
+                      />
                     )}
 
                     <div
@@ -639,7 +698,100 @@ export default function Home() {
                         />
                       )}
 
-                      <p className="whitespace-pre-wrap">{message?.content}</p>
+                      {message.role === "assistant" ? (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => (
+                              <p className="mb-3 whitespace-pre-wrap leading-7 last:mb-0">
+                                {children}
+                              </p>
+                            ),
+                            h1: ({ children }) => (
+                              <h1 className="mb-3 mt-5 text-xl font-semibold text-white first:mt-0">
+                                {children}
+                              </h1>
+                            ),
+                            h2: ({ children }) => (
+                              <h2 className="mb-2 mt-5 text-lg font-semibold text-white first:mt-0">
+                                {children}
+                              </h2>
+                            ),
+                            h3: ({ children }) => (
+                              <h3 className="mb-2 mt-4 text-base font-semibold text-white first:mt-0">
+                                {children}
+                              </h3>
+                            ),
+                            ul: ({ children }) => (
+                              <ul className="my-3 ml-5 list-disc space-y-1 marker:text-violet-300">
+                                {children}
+                              </ul>
+                            ),
+                            ol: ({ children }) => (
+                              <ol className="my-3 ml-5 list-decimal space-y-1 marker:text-violet-300">
+                                {children}
+                              </ol>
+                            ),
+                            li: ({ children }) => (
+                              <li className="pl-1">{children}</li>
+                            ),
+                            strong: ({ children }) => (
+                              <strong className="font-semibold text-white">
+                                {children}
+                              </strong>
+                            ),
+                            a: ({ href, children }) => (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-violet-300 underline underline-offset-2 hover:text-violet-200"
+                              >
+                                {children}
+                              </a>
+                            ),
+                            blockquote: ({ children }) => (
+                              <blockquote className="my-3 border-l-2 border-violet-400/60 pl-4 text-zinc-300">
+                                {children}
+                              </blockquote>
+                            ),
+                            code: ({ children }) => (
+                              <code className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[0.9em] text-violet-200">
+                                {children}
+                              </code>
+                            ),
+                            pre: ({ children }) => (
+                              <pre className="my-3 overflow-x-auto rounded-xl border border-white/10 bg-black/30 p-4 text-xs leading-6 [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-zinc-100">
+                                {children}
+                              </pre>
+                            ),
+                            hr: () => <hr className="my-4 border-white/10" />,
+                            table: ({ children }) => (
+                              <div className="my-3 overflow-x-auto">
+                                <table className="w-full border-collapse text-left text-sm">
+                                  {children}
+                                </table>
+                              </div>
+                            ),
+                            th: ({ children }) => (
+                              <th className="border border-white/10 bg-white/5 px-3 py-2 font-semibold text-white">
+                                {children}
+                              </th>
+                            ),
+                            td: ({ children }) => (
+                              <td className="border border-white/10 px-3 py-2">
+                                {children}
+                              </td>
+                            ),
+                          }}
+                        >
+                          {getMessageText(message?.content)}
+                        </ReactMarkdown>
+                      ) : (
+                        <p className="whitespace-pre-wrap">
+                          {getMessageText(message?.content)}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -708,9 +860,11 @@ export default function Home() {
 
                 {aiLoading && (
                   <div className="flex items-center gap-3">
-                    <div className="grid size-8 place-items-center rounded-lg bg-white text-zinc-900">
-                      <Workflow size={15} className="animate-pulse" />
-                    </div>
+                    <img
+                      src={infinityLogo}
+                      alt=""
+                      className="size-8 rounded-lg object-cover animate-pulse"
+                    />
                     <div className="text-sm text-zinc-400">
                       {imageUploading
                         ? "Uploading image to Cloudinary..."
@@ -719,14 +873,14 @@ export default function Home() {
                   </div>
                 )}
 
-                {/* {(chatError || agentsError) && <div className="rounded-xl border border-red-500/20 bg-red-500/8 px-4 py-3 text-sm text-red-300">{chatError || agentsError}</div>} */}
+              
               </div>
             </div>
 
             <div className="z-20 w-full shrink-0 px-3 pb-3 pt-2 sm:px-5 sm:pb-4">
               <form
                 onSubmit={handleSubmit}
-                className={`mx-auto w-full max-w-2xl rounded-2xl p-3 transition-colors focus-within:border-white/25 ${darkPanel}`}
+                className={`mx-auto w-full max-w-3xl rounded-2xl p-3 transition-colors focus-within:border-white/25 ${darkPanel}`}
               >
                 {imagePreview && (
                   <div className="mb-3 flex items-start gap-3 rounded-xl border border-white/10 bg-black/20 p-2.5">
@@ -760,23 +914,22 @@ export default function Home() {
                 <Textarea
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
-                  // onKeyDown={(event) => {
-                  //   if (
-                  //     event.key === "Enter" &&
-                  //     !event.shiftKey &&
-                  //     !event.nativeEvent.isComposing
-                  //   ) {
-                  //     event.preventDefault();
-                  //     event.currentTarget.form?.requestSubmit();
-                  //   }
-                  // }}
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      !event.shiftKey &&
+                      !event.nativeEvent.isComposing
+                    ) {
+                      event.preventDefault();
+                      event.currentTarget.form?.requestSubmit();
+                    }
+                  }}
                   placeholder={
                     selectedAgent
                       ? `Message ${selectedAgent}...`
                       : "Ask me anything..."
                   }
-                  // disabled={isBusy || Boolean(pendingApproval)}
-                  className={`min-h-20 resize-none border-0 !bg-transparent px-2 py-1.5 text-sm text-white shadow-none placeholder:text-zinc-500 focus-visible:ring-0 ${hideScrollbar}`}
+                  className={`min-h-20 resize-none border-0 bg-transparent! px-2 py-1.5 text-sm text-white shadow-none placeholder:text-zinc-500 focus-visible:ring-0 ${hideScrollbar}`}
                 />
 
                 <div className="flex items-center justify-between gap-3 pt-2">
@@ -787,7 +940,6 @@ export default function Home() {
                       variant="ghost"
                       aria-label="Attach image"
                       title="Attach image"
-                      // disabled={isBusy || Boolean(pendingApproval)}
                       onClick={() => fileInputRef.current?.click()}
                       className="size-8 rounded-lg text-zinc-300 hover:bg-white/10 hover:text-white"
                     >
@@ -805,7 +957,6 @@ export default function Home() {
                         <Button
                           type="button"
                           variant="ghost"
-                          // disabled={isBusy || Boolean(pendingApproval)}
                           className="h-8 max-w-48 gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 text-xs text-zinc-300 hover:bg-white/10 hover:text-white"
                         >
                           <Bot size={14} className="shrink-0" />
@@ -889,7 +1040,6 @@ export default function Home() {
                       type="submit"
                       size="icon"
                       disabled={aiLoading || approvalLoading || imageUploading}
-                      onClick={(e) => handleSubmit(e)}
                       aria-label="Send message"
                       className={`size-8 shrink-0 ${whiteBtn} disabled:bg-white/10 disabled:text-zinc-500`}
                     >
@@ -898,7 +1048,7 @@ export default function Home() {
                   </div>
                 </div>
               </form>
-              <p className="mx-auto mt-3 max-w-2xl text-center text-[10px] text-zinc-600">
+              <p className="mx-auto mt-3 max-w-3xl text-center text-[10px] text-zinc-600">
                 AutoMate AI can make mistakes. Verify important information.
               </p>
             </div>

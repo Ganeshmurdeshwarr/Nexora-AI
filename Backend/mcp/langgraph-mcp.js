@@ -22,11 +22,6 @@ const adapter = new MCPAdapter({
 export async function getMCPTools() {
   const tools = await adapter.listTools();
 
-  console.log(
-    "Loaded MCP tools:",
-    tools.map((tool) => tool.name)
-  );
-
   return tools;
 }
 

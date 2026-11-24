@@ -20,7 +20,6 @@ export const protect = async (req, res, next) => {
       throw new Error("JWT_SECRET is missing.");
     }
 
-    // Verify JWT from cookie
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     if (typeof decoded === "string" || !decoded.userId) {
@@ -30,7 +29,6 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // Fetch current user from MongoDB
     const user = await User.findById(decoded.userId);
 
     if (!user) {
@@ -40,7 +38,6 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // Make user available to the next middleware/controller
     req.user = user;
 
     next();

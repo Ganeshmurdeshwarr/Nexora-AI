@@ -1,18 +1,15 @@
 import api from "@/api";
 
 export const createPayment = async (plan) => {
-  try {
-    const {data} = await api.post("/api/payment/create", {
-      plan,
-    });
+  const { data } = await api.post("/api/payments/create", {
+    plan,
+  });
 
-    return data;
-  } catch (error) {
-return (error)  }
+  return data;
 };
 
 export const verify = async ( body ) => {
-  const {data} = await api.post("/api/payment/verify",body);
+  const { data } = await api.post("/api/payments/verify", body);
 
   return data;
 };

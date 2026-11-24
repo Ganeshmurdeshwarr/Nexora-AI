@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Bot, Check, Plus, Workflow } from "lucide-react";
+import { ArrowLeft, Bot, Check, Plus } from "lucide-react";
 
+import infinityLogo from "@/assets/Infinity Logo.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -74,31 +75,29 @@ export default function CreateAgent() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setError("");
+
+    if (!name.trim() || !instructions.trim()) {
+      setError("Agent name and instructions are required.");
+      return;
+    }
+
+    setSaving(true);
     try {
-      setError("");
-      
-      if (!name.trim() || !instructions.trim()) {
-        setError("Agent name and instructions are required.");
-        return;
-      }
-      setSaving(true);
-      
-      const result = await createAgent(
+      await createAgent(
         name,
         knowledgeBase,
         instructions,
         tools,
       );
-      if (result?.response?.data?.message) {
-        console.log(error);
-        setError(result?.response?.data?.message);
-        setSaving(false);
-
-        return;
-      }
-      setSaving(false);
       navigate("/agents");
     } catch (error) {
+      setError(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to create agent.",
+      );
+    } finally {
       setSaving(false);
     }
   };
@@ -113,9 +112,11 @@ export default function CreateAgent() {
       <div className="relative z-10">
         <header className="flex h-16 items-center justify-between px-5 sm:px-8">
           <Link to="/" className="flex items-center gap-2.5">
-            <span className="grid size-8 place-items-center rounded-lg bg-white text-zinc-900 shadow-[0_4px_14px_rgba(255,255,255,0.15)]">
-              <Workflow size={17} />
-            </span>
+            <img
+              src={infinityLogo}
+              alt="Nexora AI"
+              className="size-8 rounded-lg object-cover"
+            />
 
             <span className="text-sm font-medium tracking-tight text-zinc-100">
               AutoMate AI
@@ -124,7 +125,7 @@ export default function CreateAgent() {
 
           <Link
             to="/"
-            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2 text-xs text-zinc-300 transition hover:bg-white/10 hover:text-white"
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-zinc-300 transition hover:bg-white/10 hover:text-white"
           >
             <ArrowLeft size={14} />
             <span>Back to chat</span>
@@ -194,7 +195,7 @@ export default function CreateAgent() {
                 </label>
 
                 <Textarea
-                  id="agent-instructions"
+                  id="agent-knowledgeBase"
                   value={knowledgeBase}
                   onChange={(event) => setKnowledgeBase(event.target.value)}
                   placeholder="You are a helpful AI assistant. Your job is to..."
@@ -203,35 +204,6 @@ export default function CreateAgent() {
                 />
               </div>
             </section>
-
-            {/* Model */}
-            {/* <section>
-              <label
-                htmlFor="agent-model"
-                className="mb-2 block text-xs font-medium text-zinc-300"
-              >
-                AI model
-              </label>
-
-              <select
-                id="agent-model"
-                value={form.model}
-                onChange={(event) =>
-                  updateField("model", event.target.value)
-                }
-                className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-zinc-200 outline-none transition [color-scheme:dark] focus:border-white/25 [&>option]:bg-[#1d2026] [&>option]:text-zinc-200"
-              >
-                <option value="openai/gpt-oss-120b">
-                  GPT-OSS 120B
-                </option>
-
-                <option value="openai/gpt-oss-20b">
-                  GPT-OSS 20B
-                </option>
-
-               
-              </select>
-            </section> */}
 
             <section>
               <div className="mb-3">
@@ -312,7 +284,7 @@ export default function CreateAgent() {
                 onClick={handleSubmit}
                 className="h-10 rounded-xl bg-white px-5 text-xs font-medium text-zinc-900 hover:bg-zinc-200"
               >
-                create
+               
                 {saving ? "Creating..." : "Create agent"}
                 {!saving && <Plus size={15} className="ml-2" />}
               </Button>

@@ -7,7 +7,7 @@ const paymentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      // index: true,
+     
     },
 
     plan: {
@@ -23,7 +23,7 @@ const paymentSchema = new mongoose.Schema(
     },
 
     amount: {
-      type: Number, // Amount in paise
+      type: Number, 
       required: true,
       min: 1,
     },

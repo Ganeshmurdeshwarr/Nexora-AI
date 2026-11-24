@@ -1,5 +1,5 @@
-import { Workflow } from "lucide-react";
 import { LoginForm } from "../components/login-form";
+import infinityLogo from "@/assets/Infinity Logo.png";
 
 function Login() {
   return (
@@ -14,9 +14,11 @@ function Login() {
       <div className="relative z-10 w-full max-w-lg">
         {/* Brand */}
         <div className="mb-7 flex flex-col items-center text-center">
-          <div className="grid size-14 place-items-center rounded-2xl bg-white text-zinc-900 shadow-[0_10px_40px_rgba(255,255,255,0.12)]">
-            <Workflow size={26} />
-          </div>
+          <img
+            src={infinityLogo}
+            alt="Nexora AI"
+            className="size-14 rounded-2xl object-cover shadow-[0_10px_40px_rgba(255,255,255,0.12)]"
+          />
 
           <p className="mt-4 text-sm font-medium tracking-tight text-zinc-200">
             Nexora AI

@@ -698,7 +698,6 @@ GENERAL RULES:
 
     const tool_calls = lastMessage?.tool_calls || [];
 
-    // Only one approval-protected action at a time.
     if (tool_calls.length !== 1 || !approvalToolNames.has(tool_calls[0].name)) {
       return {
         messages: tool_calls.map(
@@ -771,7 +770,6 @@ GENERAL RULES:
         };
       }
 
-      // Continue to ToolNode only after approval.
       return {};
     }
 
@@ -798,17 +796,7 @@ GENERAL RULES:
         };
       }
 
-      // Validate image URL
-      // let parsedUrl;
-
-      // try {
-      //   parsedUrl = new URL(imageUrl);
-      // } catch {
-      //   parsedUrl = null;
-      // }
-
-      // STEP 3: SHOW ONE APPROVAL CARD
-      // ----------------------------------------------
+     
 
       const decision = interrupt({
         type: "instagram_post_approval",
@@ -820,9 +808,7 @@ GENERAL RULES:
           : "Review the Instagram image. A caption will be generated after you approve publishing.",
       });
 
-      // STEP 4: REJECT = DO NOT PUBLISH
-      // ----------------------------------------------
-
+     
       if (decision?.approved !== true) {
         return {
           messages: [
@@ -908,7 +894,6 @@ GENERAL RULES:
         };
       }
 
-      // Continue to ToolNode only after approval.
       return {};
     }
   };
@@ -931,11 +916,9 @@ GENERAL RULES:
     const lastMessage = state.messages[state.messages.length - 1];
 
     if (lastMessage instanceof ToolMessage) {
-      // Rejected or invalid action.
       return "chatNode";
     }
 
-    // Approved action: execute the tool.
     return "tools";
   };
   const workflow = new StateGraph(MessagesAnnotation)
@@ -998,5 +981,4 @@ export const resumeAgentGraph = async ({
   };
 };
 
-// .addEdge("blockInstagramPublish", "chat");
-// .addNode("blockInstagramPublish", blockInstagramPublishNode)
+

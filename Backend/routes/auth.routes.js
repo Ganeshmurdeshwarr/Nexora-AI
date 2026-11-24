@@ -6,7 +6,7 @@ import { protect } from "../middleware/protect.js";
 const authRouter = Router();
 
 authRouter.post("/login", login);
-authRouter.post("/logout", logOut);
+authRouter.get("/logout", logOut);
 authRouter.get("/me", protect,me);
 
 export default authRouter;

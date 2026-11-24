@@ -5,11 +5,11 @@ import {
   Check,
   Mail,
   Unplug,
-  Workflow,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaInstagram } from "react-icons/fa";
+import infinityLogo from "@/assets/Infinity Logo.png";
 import {
   connectGoogle,
   connectInstagram,
@@ -116,7 +116,7 @@ const Integration = () => {
       setError("");
       setSuccess("");
 
-      if (id === "email" || id === "googleCalendar") {
+      if (id === "gmail" || id === "googleCalendar") {
         const data = await disconnectGoogle();
 
         setSuccess(`${integration.name} disconnected successfully.`);
@@ -161,9 +161,11 @@ const Integration = () => {
         <header>
           <div className="mx-auto flex h-16 max-w-8xl items-center justify-between px-4 sm:px-6">
             <Link to="/" className="flex items-center gap-2.5">
-              <span className="grid size-8 place-items-center rounded-lg bg-white text-zinc-900 shadow-[0_4px_14px_rgba(255,255,255,0.15)]">
-                <Workflow className="size-[17px]" />
-              </span>
+              <img
+                src={infinityLogo}
+                alt="Nexora AI"
+                className="size-8 rounded-lg object-cover"
+              />
               <span className="text-sm font-medium tracking-tight text-zinc-100">
                 AutoMate AI
               </span>
@@ -210,13 +212,7 @@ const Integration = () => {
 
               const isConnecting = connecting === item?.id;
               const isDisconnecting = disconnecting === item?.id;
-              // ||
-              // (item.provider === "google" &&
-              //   disconnecting !== null &&
-              //   integrationList.find(
-              //     (entry) => entry.id === disconnecting
-              //   )?.provider === "google");
-
+             
               return (
                 <Card
                   key={item?.id}

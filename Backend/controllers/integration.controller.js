@@ -10,7 +10,6 @@ import {
 import { encrypt } from "../config/encypt-decrypt.js";
 import Integration from "../models/integration.model.js";
 
-// Connect Google account
 export const connectGoogle = async (req, res) => {
   try {
   
@@ -53,7 +52,6 @@ export const connectGoogle = async (req, res) => {
   }
 };
 
-// Google OAuth callback
 export const googleCallback = async (req, res) => {
   try {
     const { code, state, error } = req.query;
@@ -166,7 +164,6 @@ const INSTAGRAM_SCOPES = [
   
 ];
 
-// Start Instagram OAuth
 export const connectInstagram = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id;
@@ -228,27 +225,31 @@ const url = `https://www.facebook.com/dialog/oauth?${params.toString()}`;
   }
 };
 
-// Instagram OAuth callback
 export const instagramCallback = async (req, res) => {
+  const redirectToIntegration = (status) =>
+    res.redirect(`${process.env.CLIENT_URL}/integrations?instagram=${status}`);
+
   try {
     const { code, state, error } = req.query;
 
     if (error) {
-      console.error(
-        "Instagram authorization error:", error
-      );
-
-      // return res.redirect(
-      //   `${process.env.CLIENT_URL}/?instagram=error`
-      // );
+      console.error("Instagram authorization error:", error);
+      return redirectToIntegration("error");
     }
 
-  
+    if (
+      typeof code !== "string" ||
+      !code.trim() ||
+      typeof state !== "string" ||
+      !state.trim()
+    ) {
+      return redirectToIntegration("error");
+    }
 
     const decoded = jwt.verify(state, process.env.JWT_SECRET);
 
-    if (decoded.purpose !== "instagram-oauth" || !decoded.userId) {
-      return res.status(400).send("Invalid Instagram OAuth state");
+    if (!decoded || decoded.purpose !== "instagram-oauth" || !decoded.userId) {
+      return redirectToIntegration("error");
     }
 
 
@@ -283,15 +284,12 @@ const instagramAccounts = assignedAccounts?.data?.data || []
 
 if(!instagramAccounts || instagramAccounts.length === 0){
   console.error("No assigned instagram  account for this user")
-  return res.redirect(
-      `${process.env.CLIENT_URL}/?instagram=error_no_account`
-    );
+  return redirectToIntegration("error_no_account");
 }
 
 const dynamicAccountId = instagramAccounts[0]?.id
 if(!dynamicAccountId){
-  console.log("Target Account payload layout lacks a valid unique ID property");
-  return res.status(400).json({message:'Invalid payload layout from Meta graph mapping parameters'})
+  return redirectToIntegration("error");
 }
 
 
@@ -351,16 +349,14 @@ connection.status = "connected";
 connection.connectedAt = new Date();
 await connection.save();
 
-    return res.redirect(
-      `${process.env.CLIENT_URL}/integrations?instagram=connected`
-    );
+    return redirectToIntegration("connected");
   } catch (error) {
     console.error(
       "Instagram OAuth callback:",
       error.response?.data || error.message
     );
 
-   
+    return redirectToIntegration("error");
   }
 };
 
@@ -505,42 +501,7 @@ export const disconnectInstagram = async (req, res) => {
   }
 };
 
-// Get Instagram connection status
-// export const getInstagramStatus = async (req, res) => {
-//   try {
-//     const userId = req.user?._id || req.user?.id;
 
-//     if (!userId) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "Please login first",
-//       });
-//     }
-
-//     const connection = await IntegrationConnection.findOne({
-//       userId,
-//       provider: "instagram",
-//       services: "instagram",
-//       status: "connected",
-//     }).select("-tokens");
-
-//     return res.status(200).json({
-//       success: true,
-//       instagram: {
-//         connected: Boolean(connection),
-//         username: connection?.account?.username || null,
-//         connectedAt: connection?.connectedAt || null,
-//       },
-//     });
-//   } catch (error) {
-//     console.error("Get Instagram status:", error.message);
-
-//     return res.status(500).json({
-//       success: false,
-//       message: "Unable to fetch Instagram status",
-//     });
-//   }
-// };
 
 
 

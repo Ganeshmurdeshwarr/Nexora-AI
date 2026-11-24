@@ -7,11 +7,11 @@ import {
   Search,
   Trash2,
   Pencil,
-  Workflow,
   RefreshCw,
   AlertCircle,
 } from "lucide-react";
 
+import infinityLogo from "@/assets/Infinity Logo.png";
 import {
   getAllAgent,
   deleteAgent,
@@ -44,10 +44,14 @@ const { agents , agentsLoading: loading }= useSelector(state=>state.agent)
       setError("");
       const data = await getAllAgent();
       dispatch(setAgents(data));
-      dispatch(setAgentsLoading(false));
     } catch (err) {
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to load agents.",
+      );
+    } finally {
       dispatch(setAgentsLoading(false));
-      setError(err?.response?.data?.message || "Failed to load agents.");
     }
   };
     loadAgents();
@@ -72,7 +76,9 @@ const { agents , agentsLoading: loading }= useSelector(state=>state.agent)
      
     } catch (err) {
       setError(
-        err?.response?.data?.message || "Failed to delete agent."
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to delete agent.",
       );
       setDeletingId(null);
     } 
@@ -97,9 +103,11 @@ const { agents , agentsLoading: loading }= useSelector(state=>state.agent)
         <header>
           <div className="mx-auto flex h-16 max-w-8xl items-center justify-between px-4 sm:px-6">
             <Link to="/" className="flex items-center gap-2.5">
-              <span className="grid size-8 place-items-center rounded-lg bg-white text-zinc-900 shadow-[0_4px_14px_rgba(255,255,255,0.15)]">
-                <Workflow className="size-[17px]" />
-              </span>
+              <img
+                src={infinityLogo}
+                alt="Nexora AI"
+                className="size-8 rounded-lg object-cover"
+              />
               <span className="text-sm font-medium tracking-tight text-zinc-100">
                 AutoMate AI
               </span>
@@ -237,7 +245,7 @@ const { agents , agentsLoading: loading }= useSelector(state=>state.agent)
                 );
               })}
             </div>
-          ) : (
+          ) : error && !agents ? null : (
             /* Empty state */
             <div className="mt-6 flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/2 px-5 text-center">
               <div className="grid size-12 place-items-center rounded-xl bg-white text-zinc-900">
