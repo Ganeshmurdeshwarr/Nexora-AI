@@ -50,7 +50,7 @@ export const deductCredits = async ({ userId, credits }) => {
       },
     },
     {
-      new: true,
+      returnDocument: "after",
       runValidators: true,
     }
   );
