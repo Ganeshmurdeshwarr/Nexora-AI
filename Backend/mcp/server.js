@@ -744,7 +744,7 @@ IMPORTANT:
           const contentType = imageResponse.headers.get("content-type");
       
           const imageAnalyzer = new ChatGoogleGenerativeAI({
-            model: "gemini-3.8-flash",
+            model: "gemini-3.6-flash",
             temperature: 0,
             maxRetries: 2,
             apiKey: process.env.GOOGLE_API_KEY,
