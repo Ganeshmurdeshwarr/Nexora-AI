@@ -1,12 +1,14 @@
 
-import { cert, initializeApp } from "firebase-admin";
+import mongoose from "mongoose";
 
-const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+export async function connectDB() {
+  const mongoUri = process.env.MONGODB_URI;
 
-if (!serviceAccount) {
-  throw new Error("FIREBASE_SERVICE_ACCOUNT environment variable is missing.");
+  if (!mongoUri) {
+    throw new Error("MONGODB_URI is missing in .env");
+  }
+
+  await mongoose.connect(mongoUri);
+
+  console.log("MongoDB connected successfully");
 }
-
-export const app = initializeApp({
-  credential: cert(JSON.parse(serviceAccount)),
-});
