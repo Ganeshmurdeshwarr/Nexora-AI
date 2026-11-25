@@ -6,7 +6,6 @@ import { TavilySearch } from "@langchain/tavily";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
-import { error } from "node:console";
 import Integration from "../models/integration.model.js";
 import { decrypt } from "../config/encypt-decrypt.js";
 import { google } from "googleapis";
@@ -18,6 +17,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({
   path: path.resolve(__dirname, "../.env"),
+});
+
+console.log("MCP environment check:", {
+  tavily: Boolean(process.env.TAVILY_API_KEY),
+  google: Boolean(process.env.GOOGLE_API_KEY),
+  mcpAuth: Boolean(process.env.MCP_AUTH_SECRET),
 });
 
 const server = new McpServer({
