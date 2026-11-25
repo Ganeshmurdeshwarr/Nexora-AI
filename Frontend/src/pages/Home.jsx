@@ -312,6 +312,8 @@ export default function Home() {
       }
 
       setMessage("");
+      setSelectedImage(null)
+      
     } catch (error) {
       setMessages((prev) => [
         ...prev,
