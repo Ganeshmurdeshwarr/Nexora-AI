@@ -312,7 +312,7 @@ export default function Home() {
       }
 
       setMessage("");
-      setSelectedImage(null)
+      clearSelectedImage()
       
     } catch (error) {
       setMessages((prev) => [
@@ -915,6 +915,7 @@ export default function Home() {
                 )}
                 <Textarea
                   value={message}
+                  disabled={aiLoading || approvalLoading || imageUploading}
                   onChange={(event) => setMessage(event.target.value)}
                   onKeyDown={(event) => {
                     if (
