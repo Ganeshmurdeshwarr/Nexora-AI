@@ -102,7 +102,7 @@ const getGoogleOAuthClient = async (userId, requiredService) => {
 };
 
 if (!process.env.TAVILY_API_KEY) {
-  throw new error("TAVILY_API_KEY missing. check the backend .env path");
+  throw new Error("TAVILY_API_KEY missing. check the backend .env path");
 }
 
 const tavilySearch = new TavilySearch({
