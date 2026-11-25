@@ -19,11 +19,6 @@ dotenv.config({
   path: path.resolve(__dirname, "../.env"),
 });
 
-console.log("MCP environment check:", {
-  tavily: Boolean(process.env.TAVILY_API_KEY),
-  google: Boolean(process.env.GOOGLE_API_KEY),
-  mcpAuth: Boolean(process.env.MCP_AUTH_SECRET),
-});
 
 const server = new McpServer({
   name: "nexora-mcp-server",
